@@ -19,8 +19,6 @@ const ADMIN_PASSWORD = "12345";
 
 const ProductContext = createContext();
 
-// -------------------- CONTEXT & PROVIDER --------------------
-
 const ProductProvider = ({ children }) => {
     const [products, setProducts] = useState([]);
     const [toast, setToast] = useState({ message: "", type: "", id: null });
@@ -32,7 +30,6 @@ const ProductProvider = ({ children }) => {
         setTimeout(() => setToast({ message: "", type: "", id: null }), 3000);
     };
 
-    // Fetch products from MongoDB
     useEffect(() => {
         const fetchProducts = async () => {
             try {
@@ -51,7 +48,6 @@ const ProductProvider = ({ children }) => {
         fetchProducts();
     }, []);
 
-    // Add product
     const addProduct = async (product) => {
         try {
             const res = await axios.post(`${API_BASE}/products`, product);
@@ -64,7 +60,6 @@ const ProductProvider = ({ children }) => {
         }
     };
 
-    // Update product
     const updateProduct = async (updatedProduct) => {
         try {
             const id = updatedProduct.id;
@@ -90,7 +85,6 @@ const ProductProvider = ({ children }) => {
         }
     };
 
-    // Delete product
     const deleteProduct = async (id) => {
         const productToDelete = products.find((p) => p.id === id);
         if (!productToDelete) return;
@@ -137,8 +131,6 @@ const ProductProvider = ({ children }) => {
 
 const useProducts = () => useContext(ProductContext);
 
-// ------------------------- TOAST ----------------------------
-
 const Toast = () => {
     const { toast } = useProducts();
     if (!toast.message) return null;
@@ -149,8 +141,6 @@ const Toast = () => {
 
     return <div className={`${baseStyle} ${style}`}>{toast.message}</div>;
 };
-
-// ------------------------ NAVBAR ----------------------------
 
 const Navbar = () => {
     const { view, setView } = useProducts();
@@ -285,8 +275,6 @@ const Navbar = () => {
     );
 };
 
-// -------------------- CATALOG FOR HIDDEN PRINT ----------------
-
 const CatalogView = () => {
     const { products } = useProducts();
 
@@ -315,14 +303,15 @@ const CatalogView = () => {
                                     className="w-full h-[170px] object-cover"
                                 />
                             </div>
-                            <div className="flex justify-between mt-2 text-[12px] text-black w-full px-1">
-                                <span>
+                            <div className="flex justify-between mt-1 text-[11px] text-black w-full px-1">
+                                <span className="text-left">
                                     Model No. <span className="font-semibold">{p.model}</span>
                                 </span>
-                                <span>
+                                <span className="text-right">
                                     Rs.<span className="font-semibold">{p.price}/-</span>
                                 </span>
                             </div>
+
                         </div>
                     ))}
                 </div>
@@ -335,8 +324,6 @@ const CatalogView = () => {
         </div>
     );
 };
-
-// ------------------------- DOWNLOAD PDF -----------------------
 
 const DownloadPdf = () => {
     const { showToast } = useProducts();
@@ -412,23 +399,26 @@ const DownloadPdf = () => {
     );
 };
 
-// ------------------------- PRODUCT GRID -----------------------
+// ------------------------- PRODUCT CARD (Updated for Responsiveness) -----------------------
 
 const ProductCard = ({ product }) => {
     return (
-        <div className="w-[150px]">
-            <div className="rounded-[22px] overflow-hidden border-[4px] border-[#1c3f7a] bg-white">
+        // Added w-full and responsive max-w to control size within a small mobile view / A4 area
+        <div className="w-full flex flex-col items-center max-w-[150px]">
+            <div className="rounded-[22px] overflow-hidden border-[4px] border-[#1c3f7a] bg-white w-full shadow-md">
+                {/* Fixed height for catalog card look */}
                 <img
                     src={product.image}
                     alt={product.model}
                     className="w-full h-[170px] object-cover"
                 />
             </div>
-            <div className="flex justify-between mt-1 text-[12px] text-black">
-                <span>
+            {/* Ensuring text fills the card width and is justified */}
+            <div className="flex justify-between mt-1 text-[12px] text-black w-full px-1">
+                <span className="text-left">
                     Model No. <span className="font-semibold">{product.model}</span>
                 </span>
-                <span>
+                <span className="text-right">
                     Rs.<span className="font-semibold">{product.price}/-</span>
                 </span>
             </div>
@@ -436,12 +426,15 @@ const ProductCard = ({ product }) => {
     );
 };
 
+// ------------------------- PRODUCT GRID (Updated for Responsiveness) -----------------------
+
 const ProductGrid = () => {
     const { products } = useProducts();
     const visibleProducts = products;
 
     return (
-        <div className="grid grid-cols-3 gap-x-10 gap-y-10 place-items-center">
+        // Responsive Grid: 2 columns on small screens, 3 columns on medium/A4 size
+        <div className="grid grid-cols-2 gap-x-6 gap-y-10 place-items-center sm:grid-cols-3 sm:gap-x-10 w-full px-2 sm:px-0">
             {visibleProducts.map((p) => (
                 <ProductCard key={p.id} product={p} />
             ))}
@@ -449,13 +442,13 @@ const ProductGrid = () => {
     );
 };
 
-// --------------------------- HOME -----------------------------
+// --------------------------- HOME (Updated for mobile view fix) -----------------------------
 
 const Home = () => {
     return (
-        <main className="min-h-screen bg-gray-100 flex justify-center py-10 px-4">
+        <main className="min-h-screen bg-gray-100 flex justify-center py-5 sm:py-10 px-0 sm:px-4">
             <div className="flex flex-col items-center w-full max-w-2xl">
-                <div className="mb-8">
+                <div className="mb-4 sm:mb-8 w-full max-w-[595px] px-4 sm:px-0">
                     <DownloadPdf />
                 </div>
 
@@ -463,14 +456,13 @@ const Home = () => {
                     id="catalog-page"
                     className="
             w-full 
-            aspect-[1/1.414] 
-            md:w-[595px] 
-            md:h-[842px]
+            min-h-[700px]
+            max-w-[595px] 
             bg-white 
             rounded-md 
             shadow-2xl
             relative
-            px-8
+            px-4
             py-8
             overflow-hidden
           "
@@ -480,18 +472,19 @@ const Home = () => {
                         backgroundSize: "30px 30px",
                     }}
                 >
-                    <div className="mb-6 pl-1">
-                        <h1 className="text-[34px] font-bold tracking-wider text-[#003b7a] leading-[1]">
-                            Sarjan<span className="text-sm align-super">®</span>
+                    <div className="mb-6 pl-1 text-center">
+                        <h1 className="text-[30px] sm:text-[34px] font-bold tracking-wider text-[#003b7a] leading-[1] inline-block">
+                            Sarjan<span className="text-xs sm:text-sm align-super">®</span>
                         </h1>
-                        <p className="text-[11px] tracking-[2px] text-gray-700 uppercase">
+                        <p className="text-[10px] sm:text-[11px] tracking-[2px] text-gray-700 uppercase">
                             The Creation Of Creativity
                         </p>
                     </div>
 
                     <ProductGrid />
 
-                    <div className="absolute bottom-0 left-0 right-0 bg-[#003b7a] text-white flex justify-between items-center px-10 py-1 text-[13px] w-full">
+                    {/* Footer for A4/Catalog View */}
+                    <div className="absolute bottom-0 left-0 right-0 bg-[#003b7a] text-white flex justify-between items-center px-6 sm:px-10 py-1 text-[11px] sm:text-[13px] w-full">
                         <span>📞 +91 9898803407</span>
                         <span>🌍 www.sarjanindustries.com</span>
                     </div>
@@ -500,8 +493,6 @@ const Home = () => {
         </main>
     );
 };
-
-// ----------------------- LOGIN / REGISTER ----------------------
 
 const Login = () => {
     const [password, setPassword] = useState("");
@@ -644,8 +635,6 @@ const Register = () => {
     );
 };
 
-// --------------------------- 404 ------------------------------
-
 const NotFound = () => {
     const { setView } = useProducts();
     return (
@@ -663,8 +652,6 @@ const NotFound = () => {
         </main>
     );
 };
-
-// --------------------- ADMIN COMPONENTS -----------------------
 
 const ProductModal = ({ isOpen, onClose, editingProduct }) => {
     const { addProduct, updateProduct, showToast } = useProducts();
@@ -1076,8 +1063,6 @@ const AdminDashboard = () => {
     );
 };
 
-// ------------------------ APP CONTENT -------------------------
-
 function AppContent() {
     const { view } = useProducts();
 
@@ -1104,8 +1089,6 @@ function AppContent() {
         </>
     );
 }
-
-// ----------------------- ROOT EXPORT --------------------------
 
 export default function ProductCatalogApp() {
     return (
