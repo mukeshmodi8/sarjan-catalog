@@ -399,26 +399,26 @@ const DownloadPdf = () => {
     );
 };
 
-// ------------------------- PRODUCT CARD (Updated for Responsiveness) -----------------------
+// ------------------------- PRODUCT CARD (Updated for 3 column mobile fit) -----------------------
 
 const ProductCard = ({ product }) => {
     return (
-        // Added w-full and responsive max-w to control size within a small mobile view / A4 area
-        <div className="w-full flex flex-col items-center max-w-[150px]">
+        // Adjusted max-width slightly for 3 column fit on mobile.
+        <div className="w-full flex flex-col items-center max-w-[150px] sm:max-w-[150px] lg:max-w-[150px]">
             <div className="rounded-[22px] overflow-hidden border-[4px] border-[#1c3f7a] bg-white w-full shadow-md">
-                {/* Fixed height for catalog card look */}
                 <img
                     src={product.image}
                     alt={product.model}
-                    className="w-full h-[170px] object-cover"
+                    // Adjusted height for better vertical density
+                    className="w-full h-[120px] sm:h-[160px] object-cover" 
                 />
             </div>
-            {/* Ensuring text fills the card width and is justified */}
-            <div className="flex justify-between mt-1 text-[12px] text-black w-full px-1">
-                <span className="text-left">
+            {/* Reduced font size for mobile 3-column readability */}
+            <div className="flex justify-between mt-1 text-[10px] sm:text-[12px] text-black w-full px-0.5">
+                <span className="text-left leading-tight">
                     Model No. <span className="font-semibold">{product.model}</span>
                 </span>
-                <span className="text-right">
+                <span className="text-right leading-tight">
                     Rs.<span className="font-semibold">{product.price}/-</span>
                 </span>
             </div>
@@ -426,15 +426,15 @@ const ProductCard = ({ product }) => {
     );
 };
 
-// ------------------------- PRODUCT GRID (Updated for Responsiveness) -----------------------
+// ------------------------- PRODUCT GRID (Fixed to 3 columns globally) -----------------------
 
 const ProductGrid = () => {
     const { products } = useProducts();
     const visibleProducts = products;
 
     return (
-        // Responsive Grid: 2 columns on small screens, 3 columns on medium/A4 size
-        <div className="grid grid-cols-2 gap-x-6 gap-y-10 place-items-center sm:grid-cols-3 sm:gap-x-10 w-full px-2 sm:px-0">
+        // Enforcing 3 columns always and reducing gap for mobile fit
+        <div className="grid grid-cols-3 gap-x-2 gap-y-6 place-items-center sm:gap-x-10 sm:gap-y-10 w-full px-0">
             {visibleProducts.map((p) => (
                 <ProductCard key={p.id} product={p} />
             ))}
@@ -442,7 +442,7 @@ const ProductGrid = () => {
     );
 };
 
-// --------------------------- HOME (Updated for mobile view fix) -----------------------------
+// --------------------------- HOME (Updated padding for better mobile spacing) -----------------------------
 
 const Home = () => {
     return (
@@ -463,6 +463,7 @@ const Home = () => {
             shadow-2xl
             relative
             px-4
+            sm:px-8
             py-8
             overflow-hidden
           "
@@ -483,7 +484,6 @@ const Home = () => {
 
                     <ProductGrid />
 
-                    {/* Footer for A4/Catalog View */}
                     <div className="absolute bottom-0 left-0 right-0 bg-[#003b7a] text-white flex justify-between items-center px-6 sm:px-10 py-1 text-[11px] sm:text-[13px] w-full">
                         <span>📞 +91 9898803407</span>
                         <span>🌍 www.sarjanindustries.com</span>
