@@ -1,73 +1,96 @@
 // src/products/ProductsContext.jsx
 import React, { createContext, useContext, useEffect, useState } from "react";
+import axios from "axios";
+
+// ⚙️ Local vs Render backend
+const API_BASE =
+  import.meta.env.PROD
+    ? "https://sarjan-backend.onrender.com/api" // Render backend
+    : "http://localhost:5000/api";             // Local backend
 
 const ProductsContext = createContext();
 
-const STORAGE_KEY = "sarjan-products";
-
-const initialProducts = [
-  {
-    id: 1,
-    model: "101",
-    price: 120,
-    image:
-      "https://via.placeholder.com/300x350.png?text=Chair+1",
-  },
-  {
-    id: 2,
-    model: "102",
-    price: 120,
-    image:
-      "https://via.placeholder.com/300x350.png?text=Chair+2",
-  },
-  {
-    id: 3,
-    model: "103",
-    price: 120,
-    image:
-      "https://via.placeholder.com/300x350.png?text=Chair+3",
-  },
-];
-
 export const ProductsProvider = ({ children }) => {
-  const [products, setProducts] = useState(initialProducts);
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState("");
 
-  // Load from localStorage
-  useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      try {
-        setProducts(JSON.parse(saved));
-      } catch (e) {
-        console.error("Invalid products in storage");
-      }
+  // 🔹 Products laane ka function
+  const fetchProducts = async () => {
+    try {
+      setLoading(true);
+      setError("");
+      const res = await axios.get(`${API_BASE}/products`);
+      // MongoDB se _id aata hai, usko id me map kar rahe hain
+      const mapped = res.data.map((p) => ({ ...p, id: p._id }));
+      setProducts(mapped);
+    } catch (err) {
+      console.error("Fetch products error:", err);
+      setError("Failed to load products.");
+    } finally {
+      setLoading(false);
     }
-  }, []);
-
-  // Save to localStorage
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(products));
-  }, [products]);
-
-  const addProduct = (product) => {
-    setProducts((prev) => [
-      ...prev,
-      {
-        ...product,
-        id: Date.now(), // unique id
-      },
-    ]);
   };
 
-  const deleteProduct = (id) => {
-    setProducts((prev) => prev.filter((p) => p.id !== id));
+  // 🔹 Mount pe ek baar data fetch
+  useEffect(() => {
+    fetchProducts();
+  }, []);
+
+  // 🔹 Add product (Admin se)
+  const addProduct = async (product) => {
+    try {
+      const res = await axios.post(`${API_BASE}/products`, product);
+      const saved = res.data;
+      setProducts((prev) => [...prev, { ...saved, id: saved._id }]);
+    } catch (err) {
+      console.error("Add product error:", err);
+      throw err;
+    }
+  };
+
+  // 🔹 Update product
+  const updateProduct = async (updatedProduct) => {
+    try {
+      const id = updatedProduct.id;
+      const payload = {
+        model: updatedProduct.model,
+        price: updatedProduct.price,
+        image: updatedProduct.image,
+        stock: updatedProduct.stock,
+      };
+      const res = await axios.put(`${API_BASE}/products/${id}`, payload);
+      const saved = res.data;
+
+      setProducts((prev) =>
+        prev.map((p) => (p.id === id ? { ...saved, id: saved._id } : p))
+      );
+    } catch (err) {
+      console.error("Update product error:", err);
+      throw err;
+    }
+  };
+
+  // 🔹 Delete product
+  const deleteProduct = async (id) => {
+    try {
+      await axios.delete(`${API_BASE}/products/${id}`);
+      setProducts((prev) => prev.filter((p) => p.id !== id));
+    } catch (err) {
+      console.error("Delete product error:", err);
+      throw err;
+    }
   };
 
   return (
     <ProductsContext.Provider
       value={{
         products,
+        loading,
+        error,
+        fetchProducts,
         addProduct,
+        updateProduct,
         deleteProduct,
       }}
     >
