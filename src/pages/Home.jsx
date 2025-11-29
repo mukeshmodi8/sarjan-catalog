@@ -402,44 +402,40 @@ const DownloadPdf = () => {
 // ------------------------- PRODUCT CARD (Updated for 3 column mobile fit) -----------------------
 
 const ProductCard = ({ product }) => {
-    return (
-        // Adjusted max-width slightly for 3 column fit on mobile.
-        <div className="w-full flex flex-col items-center max-w-[150px] sm:max-w-[150px] lg:max-w-[150px]">
-            <div className="rounded-[22px] overflow-hidden border-[4px] border-[#1c3f7a] bg-white w-full shadow-md">
-                <img
-                    src={product.image}
-                    alt={product.model}
-                    // Adjusted height for better vertical density
-                    className="w-full h-[120px] sm:h-[160px] object-cover" 
-                />
-            </div>
-            {/* Reduced font size for mobile 3-column readability */}
-            <div className="flex justify-between mt-1 text-[10px] sm:text-[12px] text-black w-full px-0.5">
-                <span className="text-left leading-tight">
-                    Model No. <span className="font-semibold">{product.model}</span>
-                </span>
-                <span className="text-right leading-tight">
-                    Rs.<span className="font-semibold">{product.price}/-</span>
-                </span>
-            </div>
+  return (
+    <div className="w-full flex flex-col items-center">
+      <div className="rounded-[22px] overflow-hidden border-[4px] border-[#1c3f7a] bg-white w-full shadow-md">
+        {/* use aspect ratio so height is responsive */}
+        <div className="w-full aspect-[3/4]">
+          <img
+            src={product.image}
+            alt={product.model}
+            className="w-full h-full object-cover"
+          />
         </div>
-    );
+      </div>
+
+      <div className="flex justify-between mt-1 text-[10px] sm:text-[12px] text-black w-full px-0.5">
+        <span className="text-left leading-tight">
+          Model No. <span className="font-semibold">{product.model}</span>
+        </span>
+        <span className="text-right leading-tight">
+          Rs.<span className="font-semibold">{product.price}/-</span>
+        </span>
+      </div>
+    </div>
+  );
 };
 
-// ------------------------- PRODUCT GRID (Fixed to 3 columns globally) -----------------------
-
 const ProductGrid = () => {
-    const { products } = useProducts();
-    const visibleProducts = products;
-
-    return (
-        // Enforcing 3 columns always and reducing gap for mobile fit
-        <div className="grid grid-cols-3 gap-x-2 gap-y-6 place-items-center sm:gap-x-10 sm:gap-y-10 w-full px-0">
-            {visibleProducts.map((p) => (
-                <ProductCard key={p.id} product={p} />
-            ))}
-        </div>
-    );
+  const { products } = useProducts();
+  return (
+    <div className="grid grid-cols-3 gap-x-2 gap-y-6 sm:gap-x-8 sm:gap-y-10 w-full">
+      {products.map((p) => (
+        <ProductCard key={p.id} product={p} />
+      ))}
+    </div>
+  );
 };
 
 // --------------------------- HOME (Updated padding for better mobile spacing) -----------------------------
