@@ -1,9 +1,9 @@
-// server.js
 import express from "express";
 import cors from "cors";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
-import productRoutes from "./routes/product.routes.js";
+import productRoutes from "./routes/product.routes.js"
+import imageProxy from "./routes/imageProxy.js";
 
 dotenv.config();
 
@@ -13,8 +13,8 @@ app.use(
   cors({
     origin: [
       "http://localhost:5173",
-      "https://sarjan-catalog.onrender.com",    // backend ka test URL
-      "https://sarjan-catalog-1.onrender.com", // ✅ NEW: frontend ka live URL
+      "https://sarjan-catalog.onrender.com",
+      "https://sarjan-catalog-1.onrender.com",
     ],
     methods: ["GET", "POST", "PUT", "DELETE"],
   })
@@ -27,6 +27,7 @@ app.get("/", (req, res) => {
 });
 
 app.use("/api/products", productRoutes);
+app.use("/api/image-proxy", imageProxy);
 
 const MONGO_URI = process.env.MONGO_URI;
 const PORT = process.env.PORT || 5000;
