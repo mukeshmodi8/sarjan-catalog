@@ -9,9 +9,19 @@ import React, {
 } from "react";
 import axios from "axios";
 
+// -------------------- CONSTANTS --------------------
 const API_BASE = "https://sarjan-catalog.onrender.com/api";
 const ADMIN_PASSWORD = "12345";
 
+// local / live image proxy base
+const IMAGE_PROXY_BASE =
+  typeof window !== "undefined" &&
+  (window.location.hostname === "localhost" ||
+    window.location.hostname === "127.0.0.1")
+    ? "http://localhost:5000/api"
+    : "https://sarjan-catalog.onrender.com/api";
+
+// -------------------- CONTEXT ----------------------
 const ProductContext = createContext();
 
 const ProductProvider = ({ children }) => {
@@ -126,6 +136,7 @@ const ProductProvider = ({ children }) => {
 
 const useProducts = () => useContext(ProductContext);
 
+// -------------------- TOAST ------------------------
 const Toast = () => {
   const { toast } = useProducts();
   if (!toast.message) return null;
@@ -137,6 +148,7 @@ const Toast = () => {
   return <div className={`${baseStyle} ${style}`}>{toast.message}</div>;
 };
 
+// -------------------- NAVBAR -----------------------
 const Navbar = () => {
   const { view, setView } = useProducts();
   const [open, setOpen] = useState(false);
@@ -271,12 +283,13 @@ const Navbar = () => {
   );
 };
 
+// -------------------- CATALOG VIEW (hidden for print) --------
 const CatalogView = () => {
   const { products } = useProducts();
 
   return (
     <div id="catalog-page" className="sr-only">
-      <div className="w-[595px] h-fit p-10 bg-white flex flex-col items-center">
+      <div className="w-[595px] h-fit p-10 bg-white flex flex-col items-center relative">
         <div className="text-center mb-8 w-full">
           <h1 className="text-[34px] font-bold tracking-wider text-[#003b7a] leading-[1] inline-block">
             Sarjan<span className="text-sm align-super">®</span>
@@ -317,18 +330,10 @@ const CatalogView = () => {
   );
 };
 
-// ------- IMAGE PROXY BASE -----------
-const IMAGE_PROXY_BASE =
-  window.location.hostname === "localhost" ||
-  window.location.hostname === "127.0.0.1"
-    ? "http://localhost:5000/api"
-    : "https://sarjan-catalog.onrender.com/api";
-
-// ------------- DownloadPdf COMPONENT -------------
-// DownloadPdf.jsx / Home.jsx के अंदर वही file में
+// -------------------- DOWNLOAD PDF ---------------------------
 const DownloadPdf = () => {
   const { products, showToast } = useProducts();
-  const [isGenerating, setIsGenerating] = useState(false); // ✅ loading state
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const handleDownload = async () => {
     try {
@@ -337,9 +342,8 @@ const DownloadPdf = () => {
         return;
       }
 
-      setIsGenerating(true); // ✅ start loading
+      setIsGenerating(true);
 
-      // 3 x 3 per page
       const itemsPerPage = 9;
       const chunks = [];
       for (let i = 0; i < products.length; i += itemsPerPage) {
@@ -459,6 +463,7 @@ const DownloadPdf = () => {
 
         const imgData = canvas.toDataURL("image/png");
 
+        // single-page fit (no slice)
         const ratio = Math.min(
           pageWidth / canvas.width,
           pageHeight / canvas.height
@@ -480,18 +485,19 @@ const DownloadPdf = () => {
       console.error("PDF error:", err);
       showToast?.("PDF generation failed. See console for details.", "error");
     } finally {
-      setIsGenerating(false); // ✅ loading बंद
+      setIsGenerating(false);
     }
   };
 
   return (
     <>
-      {/* ✅ Full-screen loader */}
       {isGenerating && (
-        <div className="pdf-loader">
-          <div className="flex flex-col items-center gap-3">
-            <div className="loader-circle" />
-            <p className="text-lg font-semibold">Generating PDF… Please wait</p>
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-3 bg-white rounded-xl px-6 py-4 shadow-xl">
+            <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+            <p className="text-sm font-semibold text-gray-700">
+              Generating PDF… Please wait
+            </p>
           </div>
         </div>
       )}
@@ -513,9 +519,7 @@ const DownloadPdf = () => {
   );
 };
 
-
-// ------------------------- PRODUCT CARD (Updated for 3 column mobile fit) -----------------------
-
+// -------------------- PRODUCT GRID ---------------------------
 const ProductCard = ({ product }) => {
   return (
     <div className="w-full flex flex-col items-center">
@@ -552,8 +556,7 @@ const ProductGrid = () => {
   );
 };
 
-// --------------------------- HOME -----------------------------
-
+// -------------------- HOME ---------------------------
 const Home = () => {
   return (
     <main className="min-h-screen bg-gray-100 flex justify-center py-5 sm:py-10 px-0 sm:px-4">
@@ -563,7 +566,7 @@ const Home = () => {
         </div>
 
         <div
-          id="catalog-page"
+          id="catalog-page-main"
           className="
             w-full 
             min-h-[700px]
@@ -604,6 +607,7 @@ const Home = () => {
   );
 };
 
+// -------------------- AUTH / MISC PAGES ----------------------
 const Login = () => {
   const [password, setPassword] = useState("");
   const { setView } = useProducts();
@@ -763,6 +767,7 @@ const NotFound = () => {
   );
 };
 
+// -------------------- PRODUCT MODAL / LIST / ADMIN -----------
 const ProductModal = ({ isOpen, onClose, editingProduct }) => {
   const { addProduct, updateProduct, showToast } = useProducts();
   const [form, setForm] = useState({
@@ -1173,6 +1178,7 @@ const AdminDashboard = () => {
   );
 };
 
+// -------------------- MAIN APP ----------------------
 function AppContent() {
   const { view } = useProducts();
 
@@ -1202,10 +1208,8 @@ function AppContent() {
 
 export default function ProductCatalogApp() {
   return (
-    <>
-      <ProductProvider>
-        <AppContent />
-      </ProductProvider>
-    </>
+    <ProductProvider>
+      <AppContent />
+    </ProductProvider>
   );
 }

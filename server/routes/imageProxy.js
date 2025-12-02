@@ -1,30 +1,33 @@
-// server/routes/imageProxy.js  (ESM)
-import express from 'express';
-import fetch from 'node-fetch'; // node 18+ में global fetch है, पर पुरानी वर्ज़न में node-fetch उपयोग करो
+// server/routes/imageProxy.js
+import express from "express";
+
 const router = express.Router();
 
-router.get('/image-proxy', async (req, res) => {
+// GET /api/image-proxy?url=...
+router.get("/image-proxy", async (req, res) => {
   try {
     const { url } = req.query;
-    if (!url) return res.status(400).send('Missing url');
+    if (!url) {
+      return res.status(400).json({ error: "Missing url query param" });
+    }
 
-    // Basic check: allow only http(s)
-    if (!/^https?:\/\//i.test(url)) return res.status(400).send('Invalid url');
+    // Node 18+ / Render pe global fetch already hota hai
+    const response = await fetch(url);
 
-    const r = await fetch(url);
-    if (!r.ok) return res.status(502).send('Remote fetch failed');
+    if (!response.ok) {
+      console.error("Image proxy fetch failed:", response.status, url);
+      return res.status(response.status).json({ error: "Failed to fetch image" });
+    }
 
-    // copy headers that are safe (content-type, cache-control)
-    res.set('Content-Type', r.headers.get('content-type') || 'image/jpeg');
-    res.set('Cache-Control', 'public, max-age=86400');
-    // IMPORTANT: allow CORS so browser + html2canvas can use it
-    res.set('Access-Control-Allow-Origin', '*');
+    const contentType = response.headers.get("content-type") || "image/jpeg";
+    res.setHeader("Content-Type", contentType);
 
-    const buffer = await r.arrayBuffer();
-    res.status(200).send(Buffer.from(buffer));
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    res.end(buffer);
   } catch (err) {
-    console.error('proxy error', err);
-    res.status(500).send('Proxy error');
+    console.error("Image proxy error:", err);
+    res.status(500).json({ error: "Proxy error" });
   }
 });
 

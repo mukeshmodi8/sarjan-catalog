@@ -3,7 +3,7 @@ import cors from "cors";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
 import productRoutes from "./routes/product.routes.js"
-import imageProxy from "./routes/imageProxy.js";
+import imageProxyRoutes from "./routes/imageProxy.js"; 
 
 dotenv.config();
 
@@ -27,7 +27,7 @@ app.get("/", (req, res) => {
 });
 
 app.use("/api/products", productRoutes);
-app.use("/api/image-proxy", imageProxy);
+app.use("/api", imageProxyRoutes);
 
 const MONGO_URI = process.env.MONGO_URI;
 const PORT = process.env.PORT || 5000;
