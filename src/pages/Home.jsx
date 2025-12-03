@@ -9,25 +9,19 @@ import React, {
 } from "react";
 import axios from "axios";
 
-// 💡 FIX: API_BASE को डायनेमिक बनाने के लिए यह फंक्शन जोड़ा गया है
 const getApiBase = () => {
     if (
         typeof window !== "undefined" &&
         (window.location.hostname === "localhost" ||
             window.location.hostname === "127.0.0.1")
     ) {
-        // लोकल डेवलपमेंट के लिए
         return "http://localhost:5000/api";
     }
-    // लाइव या डिप्लॉयड एनवायरनमेंट के लिए
     return "https://sarjan-catalog.onrender.com/api";
 };
 
-// 💡 FIX: अब API_BASE ऑटोमैटिकली लोकल या लाइव URL लेगा
 const API_BASE = getApiBase(); 
 const ADMIN_PASSWORD = "12345";
-
-// Image Proxy अब API_BASE के लॉजिक का पालन करेगा
 const IMAGE_PROXY_BASE = API_BASE;
 
 
@@ -48,7 +42,6 @@ const ProductProvider = ({ children }) => {
         const fetchProducts = async () => {
             try {
                 setLoading(true);
-                // ✅ अब यह API_BASE (जो डायनेमिक है) का उपयोग कर रहा है
                 const res = await axios.get(`${API_BASE}/products`); 
                 const mapped = res.data.map((p) => ({ ...p, id: p._id }));
                 setProducts(mapped);
@@ -413,7 +406,7 @@ const DownloadPdf = () => {
                     imgWrap.style.background = "#fff";
 
                     const img = document.createElement("img");
-                    // ✅ IMAGE_PROXY_BASE का उपयोग 
+                    // IMAGE_PROXY_BASE (जो अब API_BASE के बराबर है) का उपयोग
                     const proxied = `${IMAGE_PROXY_BASE}/image-proxy?url=${encodeURIComponent(
                         p.image
                     )}`;
@@ -939,7 +932,6 @@ const AddProduct = () => {
         }));
     };
 
-    // 💡 FIX: Image Upload में भी डायनेमिक API_BASE का उपयोग
     const handleImageUpload = async (e) => {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -949,8 +941,7 @@ const AddProduct = () => {
 
         try {
             setUploading(true);
-            // ✅ अब यह सही API_BASE का उपयोग कर रहा है
-            const res = await fetch(`${API_BASE}/upload-image`, {
+            const res = await fetch(`${API_BASE}/upload-image`, { // API_BASE का उपयोग
                 method: "POST",
                 body: fd,
             });
