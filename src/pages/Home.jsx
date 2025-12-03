@@ -9,17 +9,26 @@ import React, {
 } from "react";
 import axios from "axios";
 
-
-const API_BASE = "https://sarjan-catalog.onrender.com/api";
-const ADMIN_PASSWORD = "12345";
-
-
-const IMAGE_PROXY_BASE =
-    typeof window !== "undefined" &&
+// 💡 FIX: API_BASE को डायनेमिक बनाने के लिए यह फंक्शन जोड़ा गया है
+const getApiBase = () => {
+    if (
+        typeof window !== "undefined" &&
         (window.location.hostname === "localhost" ||
             window.location.hostname === "127.0.0.1")
-        ? "http://localhost:5000/api"
-        : "https://sarjan-catalog.onrender.com/api";
+    ) {
+        // लोकल डेवलपमेंट के लिए
+        return "http://localhost:5000/api";
+    }
+    // लाइव या डिप्लॉयड एनवायरनमेंट के लिए
+    return "https://sarjan-catalog.onrender.com/api";
+};
+
+// 💡 FIX: अब API_BASE ऑटोमैटिकली लोकल या लाइव URL लेगा
+const API_BASE = getApiBase(); 
+const ADMIN_PASSWORD = "12345";
+
+// Image Proxy अब API_BASE के लॉजिक का पालन करेगा
+const IMAGE_PROXY_BASE = API_BASE;
 
 
 const ProductContext = createContext();
@@ -39,7 +48,8 @@ const ProductProvider = ({ children }) => {
         const fetchProducts = async () => {
             try {
                 setLoading(true);
-                const res = await axios.get(`${API_BASE}/products`);
+                // ✅ अब यह API_BASE (जो डायनेमिक है) का उपयोग कर रहा है
+                const res = await axios.get(`${API_BASE}/products`); 
                 const mapped = res.data.map((p) => ({ ...p, id: p._id }));
                 setProducts(mapped);
             } catch (err) {
@@ -206,8 +216,8 @@ const Navbar = () => {
                             <div
                                 onClick={() => handleNavClick("login")}
                                 className={`text-sm border border-blue-500 rounded-full px-3 py-1 cursor-pointer ${view === "login"
-                                    ? "bg-blue-500 text-white"
-                                    : "text-blue-600 hover:bg-blue-50"
+                                        ? "bg-blue-500 text-white"
+                                        : "text-blue-600 hover:bg-blue-50"
                                     }`}
                             >
                                 Admin Login
@@ -403,6 +413,7 @@ const DownloadPdf = () => {
                     imgWrap.style.background = "#fff";
 
                     const img = document.createElement("img");
+                    // ✅ IMAGE_PROXY_BASE का उपयोग 
                     const proxied = `${IMAGE_PROXY_BASE}/image-proxy?url=${encodeURIComponent(
                         p.image
                     )}`;
@@ -506,8 +517,8 @@ const DownloadPdf = () => {
                     onClick={handleDownload}
                     disabled={isGenerating}
                     className={`px-5 py-2 rounded-lg text-white text-sm font-semibold shadow-md transition duration-200 ${isGenerating
-                        ? "bg-blue-400 cursor-not-allowed"
-                        : "bg-blue-600 hover:bg-blue-700"
+                            ? "bg-blue-400 cursor-not-allowed"
+                            : "bg-blue-600 hover:bg-blue-700"
                         }`}
                 >
                     {isGenerating ? "Generating..." : "Download Catalog PDF"}
@@ -534,7 +545,7 @@ const ProductCard = ({ product }) => {
             {/* Model + Price (Styled Like Your Image) */}
             <div className="w-full text-center mt-2">
                 <p className="text-[12px] font-bold text-[#0f3b6a] leading-tight">
-                     <span className="font-extrabold">{product.model}</span>
+                    <span className="font-extrabold">{product.model}</span>
                 </p>
 
                 <p className="text-[12px] font-bold text-[#0f3b6a] leading-tight mt-0.5">
@@ -928,7 +939,7 @@ const AddProduct = () => {
         }));
     };
 
-    // 🔵 Image Upload handler
+    // 💡 FIX: Image Upload में भी डायनेमिक API_BASE का उपयोग
     const handleImageUpload = async (e) => {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -937,7 +948,9 @@ const AddProduct = () => {
         fd.append("image", file);
 
         try {
-            const res = await fetch("http://localhost:5000/api/upload-image", {
+            setUploading(true);
+            // ✅ अब यह सही API_BASE का उपयोग कर रहा है
+            const res = await fetch(`${API_BASE}/upload-image`, {
                 method: "POST",
                 body: fd,
             });
@@ -947,11 +960,17 @@ const AddProduct = () => {
             if (data.imageUrl) {
                 setForm((prev) => ({
                     ...prev,
-                    image: data.imageUrl,  // 👈 यही URL DB में save होगा
+                    image: data.imageUrl,
                 }));
+                showToast("Image uploaded successfully!", "success");
+            } else {
+                showToast("Image upload failed.", "error");
             }
         } catch (err) {
             console.error("Upload error:", err);
+            showToast("Image upload failed.", "error");
+        } finally {
+            setUploading(false);
         }
     };
 
@@ -965,9 +984,9 @@ const AddProduct = () => {
         }
 
         addProduct({
-            model: form.model,               // yahi name/model save hoga
+            model: form.model,
             price: Number(form.price),
-            image: form.image,               // uploaded image url
+            image: form.image,
             stock: Number(form.stock) || 0,
         });
 

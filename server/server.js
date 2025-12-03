@@ -1,4 +1,4 @@
-// server.js
+// server/server.js
 import express from "express";
 import cors from "cors";
 import mongoose from "mongoose";
@@ -13,28 +13,30 @@ import uploadRoutes from "./routes/upload.routes.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// load env from project root .env
 dotenv.config({ path: path.join(__dirname, ".env") });
 
 const app = express();
 
-console.log("ENV FILE PATH =>", path.join(__dirname, ".env"));
-console.log("MONGO_URI =>", process.env.MONGO_URI); // changed to MONGO_URI for clarity
-
 app.use(cors());
 app.use(express.json());
+
+// health and root
+app.get("/", (req, res) => res.send("Sarjan Catalog API — server is running."));
+app.get("/health", (req, res) => res.json({ status: "ok", time: new Date().toISOString() }));
 
 // serve uploads folder
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // mount routes
-app.use("/api", productRoutes);
-app.use("/api", authRoutes);
-app.use("/api", uploadRoutes);
+// productRoutes MUST export router where route paths are relative ("/")
+app.use("/api/products", productRoutes);
+app.use("/api/auth", authRoutes);      // keep auth under /api/auth
+app.use("/api", uploadRoutes);        // upload routes (like POST /api/upload-image)
 
 // connect to MongoDB
+const MONGO = process.env.MONGO_URI || process.env.MONGO;
 mongoose
-  .connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
+  .connect(MONGO, { useNewUrlParser: true, useUnifiedTopology: true })
   .then(() => {
     console.log("MongoDB Connected ✅");
   })
