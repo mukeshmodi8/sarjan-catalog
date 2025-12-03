@@ -206,8 +206,8 @@ const Navbar = () => {
                             <div
                                 onClick={() => handleNavClick("login")}
                                 className={`text-sm border border-blue-500 rounded-full px-3 py-1 cursor-pointer ${view === "login"
-                                        ? "bg-blue-500 text-white"
-                                        : "text-blue-600 hover:bg-blue-50"
+                                    ? "bg-blue-500 text-white"
+                                    : "text-blue-600 hover:bg-blue-50"
                                     }`}
                             >
                                 Admin Login
@@ -506,8 +506,8 @@ const DownloadPdf = () => {
                     onClick={handleDownload}
                     disabled={isGenerating}
                     className={`px-5 py-2 rounded-lg text-white text-sm font-semibold shadow-md transition duration-200 ${isGenerating
-                            ? "bg-blue-400 cursor-not-allowed"
-                            : "bg-blue-600 hover:bg-blue-700"
+                        ? "bg-blue-400 cursor-not-allowed"
+                        : "bg-blue-600 hover:bg-blue-700"
                         }`}
                 >
                     {isGenerating ? "Generating..." : "Download Catalog PDF"}
@@ -531,14 +531,17 @@ const ProductCard = ({ product }) => {
                 </div>
             </div>
 
-            <div className="flex justify-between mt-1 text-[10px] sm:text-[12px] text-black w-full px-0.5">
-                <span className="text-left leading-tight">
-                    Model No. <span className="font-semibold">{product.model}</span>
-                </span>
-                <span className="text-right leading-tight">
-                    Rs.<span className="font-semibold">{product.price}/-</span>
-                </span>
+            {/* Model + Price (Styled Like Your Image) */}
+            <div className="w-full text-center mt-2">
+                <p className="text-[12px] font-bold text-[#0f3b6a] leading-tight">
+                     <span className="font-extrabold">{product.model}</span>
+                </p>
+
+                <p className="text-[12px] font-bold text-[#0f3b6a] leading-tight mt-0.5">
+                    ₹.<span className="font-extrabold">{product.price}</span>/-
+                </p>
             </div>
+
         </div>
     );
 };
@@ -908,182 +911,185 @@ const ProductModal = ({ isOpen, onClose, editingProduct }) => {
 };
 
 const AddProduct = () => {
-  const { addProduct, showToast } = useProducts();
-  const [form, setForm] = useState({
-    model: "",
-    price: "",
-    image: "",
-    stock: 0,
-  });
-
-  const [uploading, setUploading] = useState(false);
-
-  const handleChange = (e) => {
-    setForm((prev) => ({
-      ...prev,
-      [e.target.name]: e.target.value,
-    }));
-  };
-
-  // 🔵 Image Upload handler
-  const handleImageUpload = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    try {
-      setUploading(true);
-      const fd = new FormData();
-      fd.append("image", file);
-
-      const res = await axios.post(`${API_BASE}/upload-image`, fd, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-
-      const { imageUrl } = res.data;
-
-      setForm((prev) => ({ ...prev, image: imageUrl }));
-      showToast("Image uploaded successfully!", "success");
-    } catch (err) {
-      console.error("Image upload error:", err);
-      showToast("Image upload failed.", "error");
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-
-    if (!form.model || !form.price || !form.image) {
-      showToast("Please fill all required fields.", "error");
-      return;
-    }
-
-    addProduct({
-      model: form.model,               // yahi name/model save hoga
-      price: Number(form.price),
-      image: form.image,               // uploaded image url
-      stock: Number(form.stock) || 0,
+    const { addProduct, showToast } = useProducts();
+    const [form, setForm] = useState({
+        model: "",
+        price: "",
+        image: "",
+        stock: 0,
     });
 
-    setForm({
-      model: "",
-      price: "",
-      image: "",
-      stock: 0,
-    });
-  };
+    const [uploading, setUploading] = useState(false);
 
-  return (
-    <div className="bg-white rounded-xl shadow-lg p-6 mb-8 border border-gray-200">
-      <h2 className="text-2xl font-bold text-gray-800 mb-6 border-b pb-3">
-        Add New Product (UPLOAD VERSION)
-      </h2>
+    const handleChange = (e) => {
+        setForm((prev) => ({
+            ...prev,
+            [e.target.name]: e.target.value,
+        }));
+    };
 
-      <form onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-4">
-        {/* Name / Model */}
-        <div className="flex flex-col">
-          <label htmlFor="model" className="text-sm font-medium mb-1">
-            Name
-          </label>
-          <input
-            type="text"
-            name="model"
-            id="model"
-            value={form.model}
-            onChange={handleChange}
-            className="border border-gray-300 rounded-lg px-4 py-2 text-base focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 transition"
-            placeholder="e.g. Fancy Lizard"
-            required
-          />
+    // 🔵 Image Upload handler
+    const handleImageUpload = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const fd = new FormData();
+        fd.append("image", file);
+
+        try {
+            const res = await fetch("http://localhost:5000/api/upload-image", {
+                method: "POST",
+                body: fd,
+            });
+
+            const data = await res.json();
+
+            if (data.imageUrl) {
+                setForm((prev) => ({
+                    ...prev,
+                    image: data.imageUrl,  // 👈 यही URL DB में save होगा
+                }));
+            }
+        } catch (err) {
+            console.error("Upload error:", err);
+        }
+    };
+
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+
+        if (!form.model || !form.price || !form.image) {
+            showToast("Please fill all required fields.", "error");
+            return;
+        }
+
+        addProduct({
+            model: form.model,               // yahi name/model save hoga
+            price: Number(form.price),
+            image: form.image,               // uploaded image url
+            stock: Number(form.stock) || 0,
+        });
+
+        setForm({
+            model: "",
+            price: "",
+            image: "",
+            stock: 0,
+        });
+    };
+
+    return (
+        <div className="bg-white rounded-xl shadow-lg p-6 mb-8 border border-gray-200">
+            <h2 className="text-2xl font-bold text-gray-800 mb-6 border-b pb-3">
+                Add New Product (UPLOAD VERSION)
+            </h2>
+
+            <form onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-4">
+                {/* Name / Model */}
+                <div className="flex flex-col">
+                    <label htmlFor="model" className="text-sm font-medium mb-1">
+                        Name
+                    </label>
+                    <input
+                        type="text"
+                        name="model"
+                        id="model"
+                        value={form.model}
+                        onChange={handleChange}
+                        className="border border-gray-300 rounded-lg px-4 py-2 text-base focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 transition"
+                        placeholder="e.g. Fancy Lizard"
+                        required
+                    />
+                </div>
+
+                {/* Price */}
+                <div className="flex flex-col">
+                    <label htmlFor="price" className="text-sm font-medium mb-1">
+                        Price (Rs)
+                    </label>
+                    <input
+                        type="number"
+                        name="price"
+                        id="price"
+                        value={form.price}
+                        onChange={handleChange}
+                        className="border border-gray-300 rounded-lg px-4 py-2 text-base focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 transition"
+                        placeholder="120"
+                        required
+                    />
+                </div>
+
+                {/* Stock */}
+                <div className="flex flex-col">
+                    <label htmlFor="stock" className="text-sm font-medium mb-1">
+                        Units in Stock
+                    </label>
+                    <input
+                        type="number"
+                        name="stock"
+                        id="stock"
+                        value={form.stock}
+                        onChange={handleChange}
+                        className="border border-gray-300 rounded-lg px-4 py-2 text-base focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 transition"
+                        placeholder="0"
+                        required
+                    />
+                </div>
+
+                {/* Image URL + Upload */}
+                <div className="flex flex-col md:col-span-3">
+                    <label htmlFor="image" className="text-sm font-medium mb-1">
+                        Image URL
+                    </label>
+                    <input
+                        type="text"
+                        name="image"
+                        id="image"
+                        value={form.image}
+                        onChange={handleChange}
+                        placeholder="Auto-filled after upload or paste manual URL"
+                        className="border border-gray-300 rounded-lg px-4 py-2 text-base focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 transition"
+                        required
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                        Paste direct link OR upload from device.
+                    </p>
+
+                    {/* Upload Button + Preview */}
+                    <div className="mt-2 flex items-center gap-4">
+                        <label className="cursor-pointer text-sm font-medium text-indigo-600 border border-dashed border-indigo-400 px-3 py-1 rounded-lg hover:bg-indigo-50">
+                            {uploading ? "Uploading..." : "Upload Image"}
+                            <input
+                                type="file"
+                                className="hidden"
+                                accept="image/*"
+                                onChange={handleImageUpload}
+                            />
+                        </label>
+
+                        {form.image && (
+                            <img
+                                src={form.image}
+                                alt="preview"
+                                style={{ width: "100px", height: "auto", marginTop: "10px" }}
+                            />
+                        )}
+
+                    </div>
+                </div>
+
+                <div className="md:col-span-1 flex items-end justify-start md:justify-end">
+                    <button
+                        type="submit"
+                        className="w-full md:w-auto px-6 py-2 text-base font-semibold rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition transform hover:scale-[1.02]"
+                    >
+                        + Save New Product
+                    </button>
+                </div>
+            </form>
         </div>
-
-        {/* Price */}
-        <div className="flex flex-col">
-          <label htmlFor="price" className="text-sm font-medium mb-1">
-            Price (Rs)
-          </label>
-          <input
-            type="number"
-            name="price"
-            id="price"
-            value={form.price}
-            onChange={handleChange}
-            className="border border-gray-300 rounded-lg px-4 py-2 text-base focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 transition"
-            placeholder="120"
-            required
-          />
-        </div>
-
-        {/* Stock */}
-        <div className="flex flex-col">
-          <label htmlFor="stock" className="text-sm font-medium mb-1">
-            Units in Stock
-          </label>
-          <input
-            type="number"
-            name="stock"
-            id="stock"
-            value={form.stock}
-            onChange={handleChange}
-            className="border border-gray-300 rounded-lg px-4 py-2 text-base focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 transition"
-            placeholder="0"
-            required
-          />
-        </div>
-
-        {/* Image URL + Upload */}
-        <div className="flex flex-col md:col-span-3">
-          <label htmlFor="image" className="text-sm font-medium mb-1">
-            Image URL
-          </label>
-          <input
-            type="text"
-            name="image"
-            id="image"
-            value={form.image}
-            onChange={handleChange}
-            placeholder="Auto-filled after upload or paste manual URL"
-            className="border border-gray-300 rounded-lg px-4 py-2 text-base focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 transition"
-            required
-          />
-          <p className="text-xs text-gray-500 mt-1">
-            Paste direct link OR upload from device.
-          </p>
-
-          {/* Upload Button + Preview */}
-          <div className="mt-2 flex items-center gap-4">
-            <label className="cursor-pointer text-sm font-medium text-indigo-600 border border-dashed border-indigo-400 px-3 py-1 rounded-lg hover:bg-indigo-50">
-              {uploading ? "Uploading..." : "Upload Image"}
-              <input
-                type="file"
-                className="hidden"
-                accept="image/*"
-                onChange={handleImageUpload}
-              />
-            </label>
-
-            {form.image && (
-              <img
-                src={form.image}
-                alt="Preview"
-                className="w-16 h-16 object-cover rounded border"
-              />
-            )}
-          </div>
-        </div>
-
-        <div className="md:col-span-1 flex items-end justify-start md:justify-end">
-          <button
-            type="submit"
-            className="w-full md:w-auto px-6 py-2 text-base font-semibold rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition transform hover:scale-[1.02]"
-          >
-            + Save New Product
-          </button>
-        </div>
-      </form>
-    </div>
-  );
+    );
 };
 
 
