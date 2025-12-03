@@ -20,10 +20,9 @@ const getApiBase = () => {
     return "https://sarjan-catalog.onrender.com/api";
 };
 
-const API_BASE = getApiBase(); 
+const API_BASE = getApiBase();
 const ADMIN_PASSWORD = "12345";
 const IMAGE_PROXY_BASE = API_BASE;
-
 
 const ProductContext = createContext();
 
@@ -42,11 +41,11 @@ const ProductProvider = ({ children }) => {
         const fetchProducts = async () => {
             try {
                 setLoading(true);
-                const res = await axios.get(`${API_BASE}/products`); 
+                const res = await axios.get(`${API_BASE}/products`);
                 const mapped = res.data.map((p) => ({ ...p, id: p._id }));
                 setProducts(mapped);
             } catch (err) {
-                console.error("Fetch products error:", err.message);
+                console.error("Fetch products error:", err?.message || err);
                 showToast("Failed to load products.", "error");
             } finally {
                 setLoading(false);
@@ -63,7 +62,7 @@ const ProductProvider = ({ children }) => {
             setProducts((prev) => [...prev, { ...saved, id: saved._id }]);
             showToast(`Product ${product.model} added successfully.`);
         } catch (err) {
-            console.error("Add product error:", err.message);
+            console.error("Add product error:", err?.message || err);
             showToast("Failed to add product.", "error");
         }
     };
@@ -88,7 +87,7 @@ const ProductProvider = ({ children }) => {
 
             showToast(`Product ${updatedProduct.model} updated.`);
         } catch (err) {
-            console.error("Update product error:", err.message);
+            console.error("Update product error:", err?.message || err);
             showToast("Failed to update product.", "error");
         }
     };
@@ -110,7 +109,7 @@ const ProductProvider = ({ children }) => {
             setProducts((prev) => prev.filter((p) => p.id !== id));
             showToast(`Product ${productToDelete.model} removed.`, "error");
         } catch (err) {
-            console.error("Delete product error:", err.message);
+            console.error("Delete product error:", err?.message || err);
             showToast("Failed to delete product.", "error");
         }
     };
@@ -139,6 +138,16 @@ const ProductProvider = ({ children }) => {
 
 const useProducts = () => useContext(ProductContext);
 
+const resolveImageUrl = (url) => {
+    if (!url) return url;
+    // If relative uploads path (starts with /uploads) -> point to server origin
+    if (url.startsWith("/uploads")) {
+        const serverOrigin = API_BASE.replace(/\/api$/, "");
+        return `${serverOrigin}${url}`;
+    }
+    // if url already absolute (http/https) return as is
+    return url;
+};
 
 const Toast = () => {
     const { toast } = useProducts();
@@ -150,7 +159,6 @@ const Toast = () => {
 
     return <div className={`${baseStyle} ${style}`}>{toast.message}</div>;
 };
-
 
 const Navbar = () => {
     const { view, setView } = useProducts();
@@ -209,8 +217,8 @@ const Navbar = () => {
                             <div
                                 onClick={() => handleNavClick("login")}
                                 className={`text-sm border border-blue-500 rounded-full px-3 py-1 cursor-pointer ${view === "login"
-                                        ? "bg-blue-500 text-white"
-                                        : "text-blue-600 hover:bg-blue-50"
+                                    ? "bg-blue-500 text-white"
+                                    : "text-blue-600 hover:bg-blue-50"
                                     }`}
                             >
                                 Admin Login
@@ -285,7 +293,6 @@ const Navbar = () => {
     );
 };
 
-
 const CatalogView = () => {
     const { products } = useProducts();
 
@@ -306,7 +313,7 @@ const CatalogView = () => {
                         <div key={p.id} className="w-[150px] flex flex-col items-center">
                             <div className="rounded-[22px] overflow-hidden border-[4px] border-[#1c3f7a] bg-white shadow-md">
                                 <img
-                                    src={p.image}
+                                    src={resolveImageUrl(p.image)}
                                     alt={p.model}
                                     className="w-full h-[170px] object-cover"
                                 />
@@ -331,7 +338,6 @@ const CatalogView = () => {
         </div>
     );
 };
-
 
 const DownloadPdf = () => {
     const { products, showToast } = useProducts();
@@ -362,7 +368,6 @@ const DownloadPdf = () => {
                 if (pageIndex > 0) {
                     pdf.addPage();
                 }
-
                 const wrapper = document.createElement("div");
                 wrapper.style.width = "595px";
                 wrapper.style.padding = "32px";
@@ -390,6 +395,9 @@ const DownloadPdf = () => {
                 grid.style.gridTemplateColumns = "repeat(3, 1fr)";
                 grid.style.gap = "12px";
 
+                // serverOrigin used to normalize
+                const serverOrigin = IMAGE_PROXY_BASE.replace(/\/api$/, "");
+
                 pageItems.forEach((p) => {
                     const card = document.createElement("div");
                     card.style.display = "flex";
@@ -406,12 +414,48 @@ const DownloadPdf = () => {
                     imgWrap.style.background = "#fff";
 
                     const img = document.createElement("img");
-                    // IMAGE_PROXY_BASE (जो अब API_BASE के बराबर है) का उपयोग
-                    const proxied = `${IMAGE_PROXY_BASE}/image-proxy?url=${encodeURIComponent(
-                        p.image
-                    )}`;
+
+                    // normalize originalUrl:
+                    let originalUrl = p.image || "";
+                    // If DB stored relative '/uploads/..' keep it (proxy accepts relative),
+                    // but for safety, if product.image is absolute pointing to server origin, keep as-is.
+                    if (originalUrl.startsWith("/uploads")) {
+                        // pass relative path to proxy (imageProxy can serve local file)
+                        originalUrl = originalUrl;
+                    } else if (originalUrl.startsWith(serverOrigin)) {
+                        // keep absolute pointing to our server
+                        originalUrl = originalUrl;
+                    } else {
+                        // external absolute url or already absolute http(s) - keep it
+                        originalUrl = originalUrl;
+                    }
+
+                    const proxied = `${IMAGE_PROXY_BASE}/image-proxy?url=${encodeURIComponent(originalUrl)}`;
+
+                    // set crossOrigin/referrerPolicy so image can be used by html2canvas without taint
                     img.crossOrigin = "anonymous";
+                    img.referrerPolicy = "no-referrer";
+
+                    img.onerror = function (ev) {
+                        // if proxied failed, fallback to direct resolved url (best-effort)
+                        try {
+                            const fallback = resolveImageUrl(p.image);
+                            if (fallback && fallback !== proxied) {
+                                img.onerror = null;
+                                img.src = fallback;
+                                return;
+                            }
+                        } catch (e) {
+                            // ignore
+                        }
+                        // blank 1x1 gif so html2canvas still works
+                        img.src = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
+                    };
+
+                    // finally set proxied src
                     img.src = proxied;
+
+                    // IMPORTANT: append img into wrapper so it renders before html2canvas
                     img.style.width = "100%";
                     img.style.height = "100%";
                     img.style.objectFit = "cover";
@@ -446,14 +490,20 @@ const DownloadPdf = () => {
 
                 document.body.appendChild(wrapper);
 
-                await new Promise((r) => setTimeout(r, 120));
+                // small wait for layout
+                await new Promise((r) => setTimeout(r, 150));
+
                 const imgs = Array.from(wrapper.querySelectorAll("img"));
                 await Promise.all(
                     imgs.map(
                         (image) =>
                             new Promise((resolve) => {
+                                // if image already loaded and has naturalHeight, resolve
                                 if (image.complete && image.naturalHeight !== 0) return resolve();
+                                // otherwise wait on load or error
                                 image.onload = image.onerror = () => resolve();
+                                // add a safety timeout
+                                setTimeout(() => resolve(), 10000);
                             })
                     )
                 );
@@ -461,11 +511,11 @@ const DownloadPdf = () => {
                 const canvas = await html2canvas(wrapper, {
                     scale: 2,
                     useCORS: true,
-                    allowTaint: true,
+                    allowTaint: false,
+                    imageTimeout: 20000,
                 });
 
                 const imgData = canvas.toDataURL("image/png");
-
 
                 const ratio = Math.min(
                     pageWidth / canvas.width,
@@ -485,7 +535,7 @@ const DownloadPdf = () => {
             pdf.save("sarjan-catalog.pdf");
             showToast?.("PDF downloaded — check your Downloads folder.", "success");
         } catch (err) {
-            console.error("PDF error:", err);
+            console.error("PDF error:", err?.message || err);
             showToast?.("PDF generation failed. See console for details.", "error");
         } finally {
             setIsGenerating(false);
@@ -510,8 +560,8 @@ const DownloadPdf = () => {
                     onClick={handleDownload}
                     disabled={isGenerating}
                     className={`px-5 py-2 rounded-lg text-white text-sm font-semibold shadow-md transition duration-200 ${isGenerating
-                            ? "bg-blue-400 cursor-not-allowed"
-                            : "bg-blue-600 hover:bg-blue-700"
+                        ? "bg-blue-400 cursor-not-allowed"
+                        : "bg-blue-600 hover:bg-blue-700"
                         }`}
                 >
                     {isGenerating ? "Generating..." : "Download Catalog PDF"}
@@ -521,14 +571,13 @@ const DownloadPdf = () => {
     );
 };
 
-
 const ProductCard = ({ product }) => {
     return (
         <div className="w-full flex flex-col items-center">
             <div className="rounded-[22px] overflow-hidden border-[4px] border-[#1c3f7a] bg-white w-full shadow-md">
                 <div className="w-full aspect-[3/4]">
                     <img
-                        src={product.image}
+                        src={resolveImageUrl(product.image)}
                         alt={product.model}
                         className="w-full h-full object-cover"
                     />
@@ -536,15 +585,17 @@ const ProductCard = ({ product }) => {
             </div>
 
             {/* Model + Price (Styled Like Your Image) */}
+            {/* Model + Price (Styled Like Your Image) */}
             <div className="w-full text-center mt-2">
                 <p className="text-[12px] font-bold text-[#0f3b6a] leading-tight">
-                    <span className="font-extrabold">{product.model}</span>
+                    Model No. <span className="font-extrabold">{product.model}</span>
                 </p>
 
                 <p className="text-[12px] font-bold text-[#0f3b6a] leading-tight mt-0.5">
-                    ₹.<span className="font-extrabold">{product.price}</span>/-
+                    Rs.<span className="font-extrabold">{product.price}</span>/-
                 </p>
             </div>
+
 
         </div>
     );
@@ -560,7 +611,6 @@ const ProductGrid = () => {
         </div>
     );
 };
-
 
 const Home = () => {
     return (
@@ -611,7 +661,6 @@ const Home = () => {
         </main>
     );
 };
-
 
 const Login = () => {
     const [password, setPassword] = useState("");
@@ -771,8 +820,6 @@ const NotFound = () => {
         </main>
     );
 };
-
-
 
 const ProductModal = ({ isOpen, onClose, editingProduct }) => {
     const { addProduct, updateProduct, showToast } = useProducts();
@@ -941,30 +988,35 @@ const AddProduct = () => {
 
         try {
             setUploading(true);
-            const res = await fetch(`${API_BASE}/upload-image`, { // API_BASE का उपयोग
+            const res = await fetch(`${API_BASE}/upload-image`, {
                 method: "POST",
                 body: fd,
             });
 
             const data = await res.json();
+            console.log("upload response:", data);
 
+            // prefer absolute imageUrl if provided by server
             if (data.imageUrl) {
                 setForm((prev) => ({
                     ...prev,
-                    image: data.imageUrl,
+                    image: data.imageUrl, // <-- save absolute URL
                 }));
                 showToast("Image uploaded successfully!", "success");
+            } else if (data.relative) {
+                // fallback to relative (will be proxied or resolved by resolveImageUrl)
+                setForm((prev) => ({ ...prev, image: data.relative }));
+                showToast("Image uploaded (relative).", "success");
             } else {
                 showToast("Image upload failed.", "error");
             }
         } catch (err) {
-            console.error("Upload error:", err);
+            console.error("Upload error:", err?.message || err);
             showToast("Image upload failed.", "error");
         } finally {
             setUploading(false);
         }
     };
-
 
     const handleSubmit = (e) => {
         e.preventDefault();
@@ -1080,7 +1132,7 @@ const AddProduct = () => {
 
                         {form.image && (
                             <img
-                                src={form.image}
+                                src={resolveImageUrl(form.image)}
                                 alt="preview"
                                 style={{ width: "100px", height: "auto", marginTop: "10px" }}
                             />
@@ -1101,7 +1153,6 @@ const AddProduct = () => {
         </div>
     );
 };
-
 
 const ProductList = () => {
     const { products, deleteProduct } = useProducts();
@@ -1159,7 +1210,7 @@ const ProductList = () => {
                                     </td>
                                     <td className="px-4 py-4 whitespace-nowrap">
                                         <img
-                                            src={p.image}
+                                            src={resolveImageUrl(p.image)}
                                             alt={p.model}
                                             className="w-16 h-16 object-cover rounded-md shadow-sm border border-gray-200"
                                         />
@@ -1246,7 +1297,6 @@ const AdminDashboard = () => {
         </main>
     );
 };
-
 
 function AppContent() {
     const { view } = useProducts();

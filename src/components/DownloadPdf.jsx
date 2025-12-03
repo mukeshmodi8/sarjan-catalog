@@ -1,65 +1,55 @@
+// src/components/DownloadPdf.jsx
 import React from "react";
-import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
 
-const DownloadPdf = () => {
-  const { showToast } = useProducts();
-
-  const handleDownload = async () => {
-    const element = document.getElementById("catalog-page");
-
-    if (!element) {
-      showToast("Catalog page not found. Cannot generate PDF.", "error");
-      return;
+function replaceImagesForCanvas(rootEl) {
+  // ensure every <img> uses crossOrigin and proxy if needed
+  const imgs = Array.from(rootEl.querySelectorAll("img"));
+  imgs.forEach((img) => {
+    // if already has proxy or same-origin, ensure crossOrigin
+    img.crossOrigin = "anonymous";
+    // If img.src is absolute and not same-origin, convert to proxy endpoint
+    try {
+      const src = img.getAttribute("src") || "";
+      if (!src) return;
+      const isRelative = src.startsWith("/") || src.startsWith(window.location.origin);
+      const isProxy = src.includes("/api/image-proxy?url=");
+      if (!isRelative && !isProxy) {
+        img.src = `/api/image-proxy?url=${encodeURIComponent(src)}`;
+      }
+    } catch (err) {
+      console.warn("replaceImagesForCanvas err", err);
     }
+  });
+}
 
-    await new Promise((resolve) => setTimeout(resolve, 50));
+export default function DownloadPdf({ containerRef, fileName = "page.pdf" }) {
+  const makePdf = async () => {
+    if (!containerRef?.current) return alert("No element to capture");
+    const root = containerRef.current;
 
-    const pdf = new jsPDF("p", "mm", "a4");
-    const canvas = await html2canvas(element, {
-      scale: 2,
+    // 1) replace images to proxy versions if needed
+    replaceImagesForCanvas(root);
+
+    // 2) wait briefly for browser to load proxied images
+    await new Promise((r) => setTimeout(r, 400)); // small delay
+
+    // 3) html2canvas
+    const canvas = await html2canvas(root, {
       useCORS: true,
+      allowTaint: false,
+      scale: 2,
+      logging: true,
     });
 
-    const imgData = canvas.toDataURL("image/png");
-
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-
-    const imgWidth = pageWidth;
-    const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-    let heightLeft = imgHeight;
-    let position = 0;
-
-    pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-    heightLeft -= pageHeight;
-
-    while (heightLeft > 0) {
-      position = heightLeft - imgHeight;
-      pdf.addPage();
-      pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
-    }
-
-    pdf.save("sarjan-catalog.pdf");
-    showToast(
-      "PDF generation initiated. File 'sarjan-catalog.pdf' downloaded.",
-      "success"
-    );
+    const imgData = canvas.toDataURL("image/jpeg", 0.95);
+    const pdf = new jsPDF("p", "pt", "a4");
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+    pdf.addImage(imgData, "JPEG", 0, 0, pdfWidth, pdfHeight);
+    pdf.save(fileName);
   };
 
-  return (
-    <div className="flex justify-end">
-      <button
-        onClick={handleDownload}
-        className="px-5 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold shadow-md hover:bg-blue-700 transition duration-200 flex items-center space-x-2"
-      >
-        <span>Download Catalog PDF</span>
-      </button>
-    </div>
-  );
-};
-
-
-export default DownloadPdf;
+  return <button onClick={makePdf}>Download PDF</button>;
+}

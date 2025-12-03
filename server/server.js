@@ -4,12 +4,13 @@ import cors from "cors";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
 import path from "path";
+import fs from "fs";
 import { fileURLToPath } from "url";
 
 import productRoutes from "./routes/product.routes.js";
 import authRoutes from "./routes/authRoutes.js";
 import uploadRoutes from "./routes/upload.routes.js";
-import imageProxyRoutes from "./routes/imageProxy.js"; // <-- नया
+import imageProxyRoutes from "./routes/imageProxy.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -18,33 +19,37 @@ dotenv.config({ path: path.join(__dirname, ".env") });
 
 const app = express();
 
-console.log("ENV FILE PATH =>", path.join(__dirname, ".env"));
-console.log("MONGO_URI =>", process.env.MONGO_URI);
+// ---------- CREATE uploads folder if not exists ----------
+const uploadPath = path.join(__dirname, "uploads");
+if (!fs.existsSync(uploadPath)) {
+  fs.mkdirSync(uploadPath, { recursive: true });
+  console.log("Uploads folder created:", uploadPath);
+}
 
-app.use(cors());
+// ---------- MIDDLEWARE ----------
 app.use(express.json());
 
-// serve uploads folder (static)
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+// ⭐ ONLY ONE CORS middleware (correct origin)
+// NOTE: remove trailing slashes in origin strings
+app.use(cors({
+  origin: ["https://sarjan-catalog.onrender.com", "http://localhost:5173"],
+  credentials: true
+}));
 
-// mount routes
+// ---------- STATIC ----------
+app.use("/uploads", express.static(uploadPath));
+
+// ---------- ROUTES ----------
 app.use("/api/products", productRoutes);
 app.use("/api", authRoutes);
 app.use("/api", uploadRoutes);
+app.use("/api", imageProxyRoutes);
 
-// MOUNT image-proxy router under /api
-app.use("/api", imageProxyRoutes); // now GET /api/image-proxy works
+// ---------- MONGO ----------
+mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
+  .then(() => console.log("MongoDB Connected ✅"))
+  .catch(err => console.error("MongoDB Error:", err.message));
 
-// connect to MongoDB
-mongoose
-  .connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
-  .then(() => {
-    console.log("MongoDB Connected ✅");
-  })
-  .catch((err) => {
-    console.error("MongoDB Error:", err.message);
-  });
-
+// ---------- SERVER ----------
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on ${PORT}`));
- 
