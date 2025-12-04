@@ -21,7 +21,8 @@ const getApiBase = () => {
 };
 
 const API_BASE = getApiBase();
-const ADMIN_PASSWORD = "12345";
+const ADMIN_EMAIL = "admin123@gmail.com";
+const ADMIN_PASSWORD = "123456";
 const IMAGE_PROXY_BASE = API_BASE;
 
 const ProductContext = createContext();
@@ -666,61 +667,71 @@ const Home = () => {
 };
 
 const Login = () => {
-    const [password, setPassword] = useState("");
-    const { setView } = useProducts();
-    const [error, setError] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const { setView } = useProducts();
+  const [error, setError] = useState("");
 
-    const handleSubmit = (e) => {
-        e.preventDefault();
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    setError("");
 
-        if (password === ADMIN_PASSWORD) {
-            localStorage.setItem("isAdmin", "true");
-            setView("admin");
-        } else {
-            setError("Wrong password");
-        }
-    };
+    if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
+      localStorage.setItem("isAdmin", "true");
+      setView("admin");
+    } else {
+      setError("Invalid email or password");
+    }
+  };
 
-    return (
-        <main className="flex items-center justify-center min-h-[calc(100vh-56px)] bg-gray-100 p-4">
-            <div className="bg-white shadow-xl rounded-xl p-8 max-w-sm w-full">
-                <h4 className="text-2xl font-bold mb-6 text-center text-gray-800">
-                    Admin Login
-                </h4>
+  return (
+    <main className="flex items-center justify-center min-h-[calc(100vh-56px)] bg-gray-100 p-4">
+      <div className="bg-white shadow-xl rounded-xl p-8 max-w-sm w-full">
+        <h4 className="text-2xl font-bold mb-6 text-center text-gray-800">
+          Admin Login
+        </h4>
 
-                <form onSubmit={handleSubmit}>
-                    <div className="mb-4">
-                        <label className="block text-sm font-medium mb-1 text-gray-700">
-                            Password
-                        </label>
-                        <input
-                            type="password"
-                            className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-blue-500 focus:border-blue-500"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                        />
-                    </div>
+        <form onSubmit={handleSubmit}>
+          <div className="mb-4">
+            <label className="block text-sm font-medium mb-1 text-gray-700">
+              Email
+            </label>
+            <input
+              type="email"
+              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-blue-500 focus:border-blue-500"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Enter Admin email"
+            />
+          </div>
 
-                    {error && <p className="text-red-500 text-xs mb-3">{error}</p>}
+          <div className="mb-4">
+            <label className="block text-sm font-medium mb-1 text-gray-700">
+              Password
+            </label>
+            <input
+              type="password"
+              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-blue-500 focus:border-blue-500"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Enter Admin password"
+            />
+          </div>
 
-                    <button
-                        type="submit"
-                        className="w-full bg-blue-600 text-white font-semibold py-2 rounded-lg hover:bg-blue-700 transition"
-                    >
-                        Login
-                    </button>
-                </form>
+          {error && <p className="text-red-500 text-xs mb-3">{error}</p>}
 
-                <p className="text-gray-500 mt-4 text-xs text-center">
-                    Demo Password:{" "}
-                    <code className="font-semibold text-blue-600">
-                        {ADMIN_PASSWORD}
-                    </code>
-                </p>
-            </div>
-        </main>
-    );
+          <button
+            type="submit"
+            className="w-full bg-blue-600 text-white font-semibold py-2 rounded-lg hover:bg-blue-700 transition"
+          >
+            Login
+          </button>
+        </form>
+      </div>
+    </main>
+  );
 };
+
 
 const Register = () => {
     const { setView } = useProducts();
