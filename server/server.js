@@ -12,44 +12,72 @@ import authRoutes from "./routes/authRoutes.js";
 import uploadRoutes from "./routes/upload.routes.js";
 import imageProxyRoutes from "./routes/imageProxy.js";
 
+// ----- __dirname setup (ESM) -----
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-dotenv.config({ path: path.join(__dirname, ".env") });
+// ----- ENV -----
+dotenv.config(); // Render + local दोनों पर काम करेगा
 
+const MONGO_URI = process.env.MONGO_URI;
+const PORT = process.env.PORT || 5000;
+
+if (!MONGO_URI) {
+  console.error("❌ MONGO_URI not found in environment variables!");
+  // Render पर error दिख जाए इसलिए:
+  // process.exit(1);  // चाहो तो enable कर सकते हो
+}
+
+// ----- APP INIT -----
 const app = express();
 
-// ---------- CREATE uploads folder if not exists ----------
+// ----- CREATE uploads FOLDER -----
 const uploadPath = path.join(__dirname, "uploads");
 if (!fs.existsSync(uploadPath)) {
   fs.mkdirSync(uploadPath, { recursive: true });
   console.log("Uploads folder created:", uploadPath);
 }
 
-// ---------- MIDDLEWARE ----------
+// ----- MIDDLEWARE -----
 app.use(express.json());
 
-// ⭐ ONLY ONE CORS middleware (correct origin)
-// NOTE: remove trailing slashes in origin strings
-app.use(cors({
-  origin: ["https://sarjan-catalog.onrender.com", "http://localhost:5173"],
-  credentials: true
-}));
+// ⚠️ CORS में FRONTEND का URL डालो, backend का नहीं
+app.use(
+  cors({
+    origin: [
+      "http://localhost:5173",
+      "https://sarjan-catalog-1.onrender.com"   // <-- यहीं डालना था
+    ],
+    credentials: true,
+  })
+);
 
-// ---------- STATIC ----------
+
+// ----- STATIC -----
 app.use("/uploads", express.static(uploadPath));
 
-// ---------- ROUTES ----------
+// ----- HEALTH CHECK ROUTE (test के लिए) -----
+app.get("/", (req, res) => {
+  res.json({ ok: true, message: "Sarjan Catalog API is live 🚀" });
+});
+
+// ----- API ROUTES -----
 app.use("/api/products", productRoutes);
 app.use("/api", authRoutes);
 app.use("/api", uploadRoutes);
 app.use("/api", imageProxyRoutes);
 
-// ---------- MONGO ----------
-mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true })
-  .then(() => console.log("MongoDB Connected ✅"))
-  .catch(err => console.error("MongoDB Error:", err.message));
-
-// ---------- SERVER ----------
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on ${PORT}`));
+// ----- MONGO + SERVER START -----
+mongoose
+  .connect(MONGO_URI)
+  .then(() => {
+    console.log("✅ MongoDB Connected");
+    app.listen(PORT, () => {
+      console.log(`🚀 Server running on port ${PORT}`);
+    });
+  })
+  .catch((err) => {
+    console.error("❌ MongoDB Error:", err.message);
+    // Render पर service crash करवानी हो तो:
+    // process.exit(1);
+  });
