@@ -340,47 +340,47 @@ const CatalogView = () => {
 };
 
 const DownloadPdf = () => {
-    const { products, showToast } = useProducts();
-    const [isGenerating, setIsGenerating] = useState(false);
+  const { products, showToast } = useProducts();
+  const [isGenerating, setIsGenerating] = useState(false);
 
-    const handleDownload = async () => {
-        try {
-            if (!products || products.length === 0) {
-                showToast?.("No products to export.", "error");
-                return;
-            }
+  const handleDownload = async () => {
+    try {
+      if (!products || products.length === 0) {
+        showToast?.("No products to export.", "error");
+        return;
+      }
 
-            setIsGenerating(true);
+      setIsGenerating(true);
 
-            const itemsPerPage = 9;
-            const chunks = [];
-            for (let i = 0; i < products.length; i += itemsPerPage) {
-                chunks.push(products.slice(i, i + itemsPerPage));
-            }
+      const itemsPerPage = 9;
+      const chunks = [];
+      for (let i = 0; i < products.length; i += itemsPerPage) {
+        chunks.push(products.slice(i, i + itemsPerPage));
+      }
 
-            const pdf = new jsPDF("p", "mm", "a4");
-            const pageWidth = pdf.internal.pageSize.getWidth();
-            const pageHeight = pdf.internal.pageSize.getHeight();
+      const pdf = new jsPDF("p", "mm", "a4");
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
 
-            for (let pageIndex = 0; pageIndex < chunks.length; pageIndex++) {
-                const pageItems = chunks[pageIndex];
+      for (let pageIndex = 0; pageIndex < chunks.length; pageIndex++) {
+        const pageItems = chunks[pageIndex];
 
-                if (pageIndex > 0) {
-                    pdf.addPage();
-                }
-                const wrapper = document.createElement("div");
-                wrapper.style.width = "595px";
-                wrapper.style.padding = "32px";
-                wrapper.style.background = "#fff";
-                wrapper.style.boxSizing = "border-box";
-                wrapper.style.position = "fixed";
-                wrapper.style.left = "-9999px";
-                wrapper.style.top = "0";
-                wrapper.style.zIndex = "99999";
-                wrapper.style.fontFamily = "Arial, Helvetica, sans-serif";
+        if (pageIndex > 0) {
+          pdf.addPage();
+        }
+        const wrapper = document.createElement("div");
+        wrapper.style.width = "595px";
+        wrapper.style.padding = "32px";
+        wrapper.style.background = "#fff";
+        wrapper.style.boxSizing = "border-box";
+        wrapper.style.position = "fixed";
+        wrapper.style.left = "-9999px";
+        wrapper.style.top = "0";
+        wrapper.style.zIndex = "99999";
+        wrapper.style.fontFamily = "Arial, Helvetica, sans-serif";
 
-                const header = document.createElement("div");
-                header.innerHTML = `
+        const header = document.createElement("div");
+        header.innerHTML = `
           <h1 style="margin:0;font-size:34px;color:#003b7a;text-align:center;font-weight:700;">
             Sarjan<span style="font-size:12px;vertical-align:super">®</span>
           </h1>
@@ -388,188 +388,191 @@ const DownloadPdf = () => {
             The Creation Of Creativity
           </p>
         `;
-                wrapper.appendChild(header);
+        wrapper.appendChild(header);
 
-                const grid = document.createElement("div");
-                grid.style.display = "grid";
-                grid.style.gridTemplateColumns = "repeat(3, 1fr)";
-                grid.style.gap = "12px";
+        const grid = document.createElement("div");
+        grid.style.display = "grid";
+        grid.style.gridTemplateColumns = "repeat(3, 1fr)";
+        grid.style.gap = "12px";
 
-                // serverOrigin used to normalize
-                const serverOrigin = IMAGE_PROXY_BASE.replace(/\/api$/, "");
+        const serverOrigin = IMAGE_PROXY_BASE.replace(/\/api$/, "");
 
-                pageItems.forEach((p) => {
-                    const card = document.createElement("div");
-                    card.style.display = "flex";
-                    card.style.flexDirection = "column";
-                    card.style.alignItems = "center";
+        pageItems.forEach((p) => {
+          const card = document.createElement("div");
+          card.style.display = "flex";
+          card.style.flexDirection = "column";
+          card.style.alignItems = "center";
 
-                    const imgWrap = document.createElement("div");
-                    imgWrap.style.width = "100%";
-                    imgWrap.style.aspectRatio = "3/4";
-                    imgWrap.style.overflow = "hidden";
-                    imgWrap.style.borderRadius = "18px";
-                    imgWrap.style.border = "4px solid #1c3f7a";
-                    imgWrap.style.boxSizing = "border-box";
-                    imgWrap.style.background = "#fff";
+          const imgWrap = document.createElement("div");
+          imgWrap.style.width = "100%";
+          imgWrap.style.aspectRatio = "3/4";
+          imgWrap.style.overflow = "hidden";
+          imgWrap.style.borderRadius = "18px";
+          imgWrap.style.border = "4px solid #1c3f7a";
+          imgWrap.style.boxSizing = "border-box";
+          imgWrap.style.background = "#fff";
 
-                    const img = document.createElement("img");
+          const img = document.createElement("img");
 
-                    // normalize originalUrl:
-                    let originalUrl = p.image || "";
-                    // If DB stored relative '/uploads/..' keep it (proxy accepts relative),
-                    // but for safety, if product.image is absolute pointing to server origin, keep as-is.
-                    if (originalUrl.startsWith("/uploads")) {
-                        // pass relative path to proxy (imageProxy can serve local file)
-                        originalUrl = originalUrl;
-                    } else if (originalUrl.startsWith(serverOrigin)) {
-                        // keep absolute pointing to our server
-                        originalUrl = originalUrl;
-                    } else {
-                        // external absolute url or already absolute http(s) - keep it
-                        originalUrl = originalUrl;
-                    }
+          let originalUrl = p.image || "";
+          if (originalUrl.startsWith("/uploads")) {
+            originalUrl = originalUrl;
+          } else if (originalUrl.startsWith(serverOrigin)) {
+            originalUrl = originalUrl;
+          } else {
+            originalUrl = originalUrl;
+          }
 
-                    const proxied = `${IMAGE_PROXY_BASE}/image-proxy?url=${encodeURIComponent(originalUrl)}`;
+          const proxied = `${IMAGE_PROXY_BASE}/image-proxy?url=${encodeURIComponent(
+            originalUrl
+          )}`;
 
-                    // set crossOrigin/referrerPolicy so image can be used by html2canvas without taint
-                    img.crossOrigin = "anonymous";
-                    img.referrerPolicy = "no-referrer";
+          img.crossOrigin = "anonymous";
+          img.referrerPolicy = "no-referrer";
 
-                    img.onerror = function (ev) {
-                        // if proxied failed, fallback to direct resolved url (best-effort)
-                        try {
-                            const fallback = resolveImageUrl(p.image);
-                            if (fallback && fallback !== proxied) {
-                                img.onerror = null;
-                                img.src = fallback;
-                                return;
-                            }
-                        } catch (e) {
-                            // ignore
-                        }
-                        // blank 1x1 gif so html2canvas still works
-                        img.src = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
-                    };
+          img.onerror = function () {
+            try {
+              const fallback = resolveImageUrl(p.image);
+              if (fallback && fallback !== proxied) {
+                img.onerror = null;
+                img.src = fallback;
+                return;
+              }
+            } catch (e) {}
+            img.src =
+              "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
+          };
 
-                    // finally set proxied src
-                    img.src = proxied;
+          img.src = proxied;
+          img.style.width = "100%";
+          img.style.height = "100%";
+          img.style.objectFit = "cover";
+          imgWrap.appendChild(img);
 
-                    // IMPORTANT: append img into wrapper so it renders before html2canvas
-                    img.style.width = "100%";
-                    img.style.height = "100%";
-                    img.style.objectFit = "cover";
-                    imgWrap.appendChild(img);
+          // 🔥 YAHAN TEXT BLOCK CHANGE KIYA HAI
+          const info = document.createElement("div");
+          info.style.display = "flex";
+          info.style.flexDirection = "column";
+          info.style.alignItems = "center";
+          info.style.justifyContent = "center";
+          info.style.width = "100%";
+          info.style.marginTop = "6px";
+          info.style.fontSize = "11px";
+          info.style.color = "#0f3b6a";
+          info.style.fontWeight = "700";
+          info.style.lineHeight = "1.2";
+          info.style.textAlign = "center";
 
-                    const info = document.createElement("div");
-                    info.style.display = "flex";
-                    info.style.justifyContent = "space-between";
-                    info.style.width = "100%";
-                    info.style.marginTop = "6px";
-                    info.style.fontSize = "11px";
-                    info.innerHTML = `<span>Model No. <strong>${p.model}</strong></span><span>Rs.<strong>${p.price}</strong>/-</span>`;
+          const line1 = document.createElement("span");
+          line1.innerHTML = `Model No. <span style="font-weight:800;">${p.model}</span>`;
 
-                    card.appendChild(imgWrap);
-                    card.appendChild(info);
-                    grid.appendChild(card);
-                });
+          const line2 = document.createElement("span");
+          line2.style.marginTop = "2px";
+          line2.innerHTML = `Rs.<span style="font-weight:800;">${p.price}</span>/-`;
 
-                wrapper.appendChild(grid);
+          info.appendChild(line1);
+          info.appendChild(line2);
+          // 🔥 text block end
 
-                const footer = document.createElement("div");
-                footer.style.marginTop = "18px";
-                footer.style.display = "flex";
-                footer.style.justifyContent = "space-between";
-                footer.style.alignItems = "center";
-                footer.style.background = "#003b7a";
-                footer.style.color = "white";
-                footer.style.padding = "6px 12px";
-                footer.style.fontSize = "12px";
-                footer.innerHTML = `<span>📞 +91 9898803407</span><span>🌍 www.sarjanindustries.com</span>`;
-                wrapper.appendChild(footer);
+          card.appendChild(imgWrap);
+          card.appendChild(info);
+          grid.appendChild(card);
+        });
 
-                document.body.appendChild(wrapper);
+        wrapper.appendChild(grid);
 
-                // small wait for layout
-                await new Promise((r) => setTimeout(r, 150));
+        const footer = document.createElement("div");
+        footer.style.marginTop = "18px";
+        footer.style.display = "flex";
+        footer.style.justifyContent = "space-between";
+        footer.style.alignItems = "center";
+        footer.style.background = "#003b7a";
+        footer.style.color = "white";
+        footer.style.padding = "6px 12px";
+        footer.style.fontSize = "12px";
+        footer.innerHTML = `<span>📞 +91 9898803407</span><span>🌍 www.sarjanindustries.com</span>`;
+        wrapper.appendChild(footer);
 
-                const imgs = Array.from(wrapper.querySelectorAll("img"));
-                await Promise.all(
-                    imgs.map(
-                        (image) =>
-                            new Promise((resolve) => {
-                                // if image already loaded and has naturalHeight, resolve
-                                if (image.complete && image.naturalHeight !== 0) return resolve();
-                                // otherwise wait on load or error
-                                image.onload = image.onerror = () => resolve();
-                                // add a safety timeout
-                                setTimeout(() => resolve(), 10000);
-                            })
-                    )
-                );
+        document.body.appendChild(wrapper);
 
-                const canvas = await html2canvas(wrapper, {
-                    scale: 2,
-                    useCORS: true,
-                    allowTaint: false,
-                    imageTimeout: 20000,
-                });
+        await new Promise((r) => setTimeout(r, 150));
 
-                const imgData = canvas.toDataURL("image/png");
+        const imgs = Array.from(wrapper.querySelectorAll("img"));
+        await Promise.all(
+          imgs.map(
+            (image) =>
+              new Promise((resolve) => {
+                if (image.complete && image.naturalHeight !== 0) return resolve();
+                image.onload = image.onerror = () => resolve();
+                setTimeout(() => resolve(), 10000);
+              })
+          )
+        );
 
-                const ratio = Math.min(
-                    pageWidth / canvas.width,
-                    pageHeight / canvas.height
-                );
-                const imgWidth = canvas.width * ratio;
-                const imgHeight = canvas.height * ratio;
+        const canvas = await html2canvas(wrapper, {
+          scale: 2,
+          useCORS: true,
+          allowTaint: false,
+          imageTimeout: 20000,
+        });
 
-                const x = (pageWidth - imgWidth) / 2;
-                const y = (pageHeight - imgHeight) / 2;
+        const imgData = canvas.toDataURL("image/png");
 
-                pdf.addImage(imgData, "PNG", x, y, imgWidth, imgHeight);
+        const ratio = Math.min(
+          pageWidth / canvas.width,
+          pageHeight / canvas.height
+        );
+        const imgWidth = canvas.width * ratio;
+        const imgHeight = canvas.height * ratio;
 
-                document.body.removeChild(wrapper);
-            }
+        const x = (pageWidth - imgWidth) / 2;
+        const y = (pageHeight - imgHeight) / 2;
 
-            pdf.save("sarjan-catalog.pdf");
-            showToast?.("PDF downloaded — check your Downloads folder.", "success");
-        } catch (err) {
-            console.error("PDF error:", err?.message || err);
-            showToast?.("PDF generation failed. See console for details.", "error");
-        } finally {
-            setIsGenerating(false);
-        }
-    };
+        pdf.addImage(imgData, "PNG", x, y, imgWidth, imgHeight);
 
-    return (
-        <>
-            {isGenerating && (
-                <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-                    <div className="flex flex-col items-center gap-3 bg-white rounded-xl px-6 py-4 shadow-xl">
-                        <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                        <p className="text-sm font-semibold text-gray-700">
-                            Generating PDF… Please wait
-                        </p>
-                    </div>
-                </div>
-            )}
+        document.body.removeChild(wrapper);
+      }
 
-            <div className="flex justify-end">
-                <button
-                    onClick={handleDownload}
-                    disabled={isGenerating}
-                    className={`px-5 py-2 rounded-lg text-white text-sm font-semibold shadow-md transition duration-200 ${isGenerating
-                        ? "bg-blue-400 cursor-not-allowed"
-                        : "bg-blue-600 hover:bg-blue-700"
-                        }`}
-                >
-                    {isGenerating ? "Generating..." : "Download Catalog PDF"}
-                </button>
-            </div>
-        </>
-    );
+      pdf.save("sarjan-catalog.pdf");
+      showToast?.("PDF downloaded — check your Downloads folder.", "success");
+    } catch (err) {
+      console.error("PDF error:", err?.message || err);
+      showToast?.("PDF generation failed. See console for details.", "error");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  return (
+    <>
+      {isGenerating && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-3 bg-white rounded-xl px-6 py-4 shadow-xl">
+            <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+            <p className="text-sm font-semibold text-gray-700">
+              Generating PDF… Please wait
+            </p>
+          </div>
+        </div>
+      )}
+
+      <div className="flex justify-end">
+        <button
+          onClick={handleDownload}
+          disabled={isGenerating}
+          className={`px-5 py-2 rounded-lg text-white text-sm font-semibold shadow-md transition duration-200 ${
+            isGenerating
+              ? "bg-blue-400 cursor-not-allowed"
+              : "bg-blue-600 hover:bg-blue-700"
+          }`}
+        >
+          {isGenerating ? "Generating..." : "Download Catalog PDF"}
+        </button>
+      </div>
+    </>
+  );
 };
+
 
 const ProductCard = ({ product }) => {
     return (
@@ -588,11 +591,11 @@ const ProductCard = ({ product }) => {
             {/* Model + Price (Styled Like Your Image) */}
             <div className="w-full text-center mt-2">
                 <p className="text-[12px] font-bold text-[#0f3b6a] leading-tight">
-                    Model No. <span className="font-extrabold">{product.model}</span>
+                     <span className="font-extrabold">{product.model}</span>
                 </p>
 
                 <p className="text-[12px] font-bold text-[#0f3b6a] leading-tight mt-0.5">
-                    Rs.<span className="font-extrabold">{product.price}</span>/-
+                    ₹.<span className="font-extrabold">{product.price}</span>/-
                 </p>
             </div>
 
