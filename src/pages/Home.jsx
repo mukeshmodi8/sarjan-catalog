@@ -2,6 +2,8 @@ import jsPDF from "jspdf";
 import html2canvas from "html2canvas-pro";
 import React, { useState, useContext, createContext, useMemo, useEffect } from "react";
 import axios from "axios";
+import headerLogo from "/watermark.png"; // public folder me hai to '/' se chalega
+
 
 // 먼저 API_BASE 선언
 const getApiBase = () => {
@@ -436,9 +438,10 @@ const CatalogView = () => {
             <div className="w-[595px] h-fit p-10 bg-white flex flex-col items-center relative">
                 <div className="text-center mb-8 w-full flex flex-col items-center">
                     <img
-                        src={WATERMARK_URL}
-                        alt="Sarjan Logo"
-                        className="w-16 h-16 mb-3 opacity-90"
+                        src={headerLogo}
+                        alt="Logo"
+                        className="w-20 mb-2 select-none"
+                        draggable={false}
                     />
 
                     <h1 className="text-[34px] font-bold tracking-wider text-[#003b7a] leading-[1] inline-block">
@@ -449,6 +452,7 @@ const CatalogView = () => {
                         The Creation Of Creativity
                     </p>
                 </div>
+
 
                 <div className="grid grid-cols-3 gap-x-8 gap-y-10 place-items-center w-full">
                     {products.map((p) => (
@@ -584,19 +588,28 @@ const DownloadPdf = ({ productsToExport, selectedCategory, selectedSub }) => {
                 // 🔹 HEADER + CATEGORY TITLE
                 const header = document.createElement("div");
                 header.innerHTML = `
-                    <h1 style="margin:0;font-size:34px;color:#003b7a;text-align:center;font-weight:700;">
-                        Sarjan<span style="font-size:12px;vertical-align:super">®</span>
-                    </h1>
-                    <p style="margin:6px 0 6px;text-align:center;font-size:11px;color:#666;letter-spacing:2px">
-                        The Creation Of Creativity
-                    </p>
-                    ${selectedCategory
-                        ? `<p style="margin:0 0 18px;text-align:center;font-size:12px;color:#0f3b6a;font-weight:700;">
-                                 ${selectedCategory}${selectedSub ? " • " + selectedSub : ""}
-                               </p>`
-                        : ""
-                    }
-                `;
+    <div style="text-align:center; margin-bottom:18px;">
+        <h1 style="margin:0;font-size:34px;color:#003b7a;font-weight:700;">
+            Sarjan<span style="font-size:12px;vertical-align:super">®</span>
+        </h1>
+        <p style="margin:6px 0 4px;font-size:11px;color:#666;letter-spacing:2px">
+            The Creation Of Creativity
+        </p>
+
+        <!-- CATEGORY + SUBCATEGORY TITLE -->
+        <h2 style="
+            margin-top:10px;
+            font-size:18px;
+            color:#0f3b6a;
+            font-weight:700;
+            text-transform:uppercase;
+        ">
+            ${selectedCategory ? selectedCategory : "All Categories"}
+            ${selectedSub ? "  •  " + selectedSub : ""}
+        </h2>
+    </div>
+`;
+
                 wrapper.appendChild(header);
 
                 const grid = document.createElement("div");
