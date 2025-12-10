@@ -1,4 +1,4 @@
-// server/models/product.model.js
+// server/models/Product.js  (ya product.model.js – jo bhi tum use कर रहे हो)
 import mongoose from "mongoose";
 
 const productSchema = new mongoose.Schema(
@@ -23,9 +23,21 @@ const productSchema = new mongoose.Schema(
       required: true,
       default: 0,
     },
+
+    // 👇👇 NEW FIELDS
+    category: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    subcategory: {
+      type: String,
+      default: "",
+      trim: true,
+    },
   },
   {
-    timestamps: true, // createdAt, updatedAt
+    timestamps: true,
   }
 );
 

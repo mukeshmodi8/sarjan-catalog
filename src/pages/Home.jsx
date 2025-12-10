@@ -815,17 +815,27 @@ const ProductGrid = () => {
 };
 
 const Home = () => {
-    const { loading, products, categories } = useProducts();
+    // 1️⃣ context se sab le lo
+    const { loading, products, categories, filters, setFilters } = useProducts();
+
+    // 2️⃣ local state
     const [selectedCategory, setSelectedCategory] = useState("");
     const [selectedSub, setSelectedSub] = useState("");
 
-    // filter products by selected category/subcategory
+    // 3️⃣ filters ko local state ke saath sync karo (lekin **kuch force** mat karo)
+    useEffect(() => {
+        setSelectedCategory(filters.category || "");
+        setSelectedSub(filters.subcategory || "");
+    }, [filters.category, filters.subcategory]);
+
+    // 4️⃣ filtered products
     const filtered = products.filter((p) => {
         if (selectedCategory && p.category !== selectedCategory) return false;
         if (selectedSub && p.subcategory !== selectedSub) return false;
         return true;
     });
 
+    // 5️⃣ UI
     return (
         <main className="min-h-screen bg-gray-100 flex justify-center py-5 sm:py-10 px-0 sm:px-4">
             <div className="flex flex-col items-center w-full max-w-2xl">
@@ -836,11 +846,14 @@ const Home = () => {
                 {/* Filters + Loading */}
                 <div className="w-full max-w-[595px] mb-4 px-4 sm:px-0">
                     <div className="flex gap-2 items-center mb-3">
+                        {/* CATEGORY DROPDOWN */}
                         <select
                             value={selectedCategory}
                             onChange={(e) => {
-                                setSelectedCategory(e.target.value);
+                                const value = e.target.value; // "" ya category name
+                                setSelectedCategory(value);
                                 setSelectedSub("");
+                                setFilters({ category: value, subcategory: "" });
                             }}
                             className="border rounded px-3 py-2 text-sm"
                         >
@@ -852,9 +865,14 @@ const Home = () => {
                             ))}
                         </select>
 
+                        {/* SUBCATEGORY DROPDOWN */}
                         <select
                             value={selectedSub}
-                            onChange={(e) => setSelectedSub(e.target.value)}
+                            onChange={(e) => {
+                                const value = e.target.value;
+                                setSelectedSub(value);
+                                setFilters((prev) => ({ ...prev, subcategory: value }));
+                            }}
                             className="border rounded px-3 py-2 text-sm"
                             disabled={!selectedCategory}
                         >
@@ -873,26 +891,36 @@ const Home = () => {
                         <div className="w-full flex items-center justify-center py-8">
                             <div className="flex flex-col items-center">
                                 <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-3"></div>
-                                <p className="text-sm font-medium text-gray-700">Loading products — please wait</p>
+                                <p className="text-sm font-medium text-gray-700">
+                                    Loading products — please wait
+                                </p>
                             </div>
                         </div>
                     ) : (
-                        <div id="catalog-page-main" className="w-full min-h-[700px] max-w-[595px] bg-white rounded-md shadow-2xl relative px-4 sm:px-8 py-8 overflow-hidden" style={{
-                            backgroundImage:
-                                "repeating-linear-gradient(45deg, #ededed 0, #ededed 1px, transparent 1px, transparent 30px), repeating-linear-gradient(-45deg, #ededed 0, #ededed 1px, transparent 1px, transparent 30px)",
-                            backgroundSize: "30px 30px",
-                        }}>
+                        <div
+                            id="catalog-page-main"
+                            className="w-full min-h-[700px] max-w-[595px] bg-white rounded-md shadow-2xl relative px-4 sm:px-8 py-8 overflow-hidden"
+                            style={{
+                                backgroundImage:
+                                    "repeating-linear-gradient(45deg, #ededed 0, #ededed 1px, transparent 1px, transparent 30px), repeating-linear-gradient(-45deg, #ededed 0, #ededed 1px, transparent 1px, transparent 30px)",
+                                backgroundSize: "30px 30px",
+                            }}
+                        >
                             <div className="mb-6 pl-1 text-center">
                                 <h1 className="text-[30px] sm:text-[34px] font-bold tracking-wider text-[#003b7a] leading-[1] inline-block">
                                     Sarjan<span className="text-xs sm:text-sm align-super">®</span>
                                 </h1>
-                                <p className="text-[10px] sm:text-[11px] tracking-[2px] text-gray-700 uppercase">The Creation Of Creativity</p>
+                                <p className="text-[10px] sm:text-[11px] tracking-[2px] text-gray-700 uppercase">
+                                    The Creation Of Creativity
+                                </p>
                             </div>
 
                             {/* product grid shows filtered */}
                             <div className="grid grid-cols-3 gap-x-2 gap-y-6 sm:gap-x-8 sm:gap-y-10 w-full">
                                 {filtered.length === 0 ? (
-                                    <p className="text-center text-gray-500 col-span-3">No products to show.</p>
+                                    <p className="text-center text-gray-500 col-span-3">
+                                        No products to show.
+                                    </p>
                                 ) : (
                                     filtered.map((p) => <ProductCard key={p.id} product={p} />)
                                 )}

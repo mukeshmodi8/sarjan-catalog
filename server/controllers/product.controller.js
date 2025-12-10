@@ -24,8 +24,15 @@ const getProduct = async (req, res) => {
 
 const createProduct = async (req, res) => {
   try {
-    const { model, price, image, stock } = req.body;
-    const p = new Product({ model, price, image, stock });
+    const { model, price, image, stock, category, subcategory } = req.body;
+    const p = new Product({
+      model,
+      price,
+      image,
+      stock,
+      category: category || "",
+      subcategory: subcategory || "",
+    });
     const saved = await p.save();
     res.status(201).json(saved);
   } catch (err) {
@@ -36,7 +43,20 @@ const createProduct = async (req, res) => {
 
 const updateProduct = async (req, res) => {
   try {
-    const updated = await Product.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const { model, price, image, stock, category, subcategory } = req.body;
+
+    const updated = await Product.findByIdAndUpdate(
+      req.params.id,
+      {
+        model,
+        price,
+        image,
+        stock,
+        category: category || "",
+        subcategory: subcategory || "",
+      },
+      { new: true }
+    );
     res.json(updated);
   } catch (err) {
     console.error("updateProduct error:", err);

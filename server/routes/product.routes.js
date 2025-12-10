@@ -2,10 +2,9 @@
 import express from "express";
 import Product from "../models/Product.js";
 
-
 const router = express.Router();
 
-// GET all products  =>  GET /api/products
+// GET all products
 router.get("/", async (req, res) => {
   try {
     const products = await Product.find().sort({ createdAt: -1 });
@@ -19,13 +18,15 @@ router.get("/", async (req, res) => {
 // POST create product  =>  POST /api/products
 router.post("/", async (req, res) => {
   try {
-    const { model, price, image, stock } = req.body;
+    const { model, price, image, stock, category, subcategory } = req.body;
 
     const newProduct = await Product.create({
       model,
       price,
       image,
       stock,
+      category: category || "",
+      subcategory: subcategory || "",
     });
 
     res.status(201).json(newProduct);
@@ -39,11 +40,18 @@ router.post("/", async (req, res) => {
 router.put("/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const { model, price, image, stock } = req.body;
+    const { model, price, image, stock, category, subcategory } = req.body;
 
     const updated = await Product.findByIdAndUpdate(
       id,
-      { model, price, image, stock },
+      {
+        model,
+        price,
+        image,
+        stock,
+        category: category || "",
+        subcategory: subcategory || "",
+      },
       { new: true }
     );
 
@@ -58,7 +66,7 @@ router.put("/:id", async (req, res) => {
   }
 });
 
-// DELETE product  =>  DELETE /api/products/:id
+// DELETE product
 router.delete("/:id", async (req, res) => {
   try {
     const { id } = req.params;
