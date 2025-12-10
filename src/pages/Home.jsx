@@ -32,7 +32,15 @@ const ProductProvider = ({ children }) => {
     const [toast, setToast] = useState({ message: "", type: "", id: null });
     const [view, setView] = useState("home");
     const [loading, setLoading] = useState(false);
-    const [filters, setFilters] = useState({ category: "", subcategory: "" });
+    const [filters, setFilters] = useState(() => {
+        try {
+            const raw = localStorage.getItem("sarjan_filters");
+            return raw ? JSON.parse(raw) : { category: "", subcategory: "" };
+        } catch {
+            return { category: "", subcategory: "" };
+        }
+    });
+
 
     const [categories, setCategories] = useState(() => {
         try {
@@ -53,6 +61,13 @@ const ProductProvider = ({ children }) => {
         setToast({ message, type, id: Date.now() });
         setTimeout(() => setToast({ message: "", type: "", id: null }), 3000);
     };
+    useEffect(() => {
+        try {
+            localStorage.setItem("sarjan_filters", JSON.stringify(filters));
+        } catch (e) {
+            console.warn("Failed to persist filters", e);
+        }
+    }, [filters]);
 
     useEffect(() => {
         const fetchProducts = async () => {
@@ -240,7 +255,7 @@ const ProductProvider = ({ children }) => {
             filters,
             setFilters,
         }),
-        [products, toast, view, loading, categories]
+        [products, toast, view, loading, categories, filters]
     );
 
     return (
@@ -827,6 +842,7 @@ const Home = () => {
         setSelectedCategory(filters.category || "");
         setSelectedSub(filters.subcategory || "");
     }, [filters.category, filters.subcategory]);
+
 
     // 4️⃣ filtered products
     const filtered = products.filter((p) => {
