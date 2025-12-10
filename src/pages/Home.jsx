@@ -461,20 +461,19 @@ const CatalogView = () => {
     );
 };
 
-const DownloadPdf = ({ productsToExport }) => {
+const DownloadPdf = ({ productsToExport, selectedCategory, selectedSub }) => {
     const { products: allProducts, showToast } = useProducts();
     const [isGenerating, setIsGenerating] = useState(false);
 
-    // layout option state
-    const [preset, setPreset] = useState("3x3"); // "3x3" | "4x4" | "custom"
+    const [preset, setPreset] = useState("3x3");
     const [rows, setRows] = useState(3);
     const [cols, setCols] = useState(3);
 
     const effectiveProducts = productsToExport ?? allProducts;
 
     const computeItemsPerPage = () => {
-        if (preset === "3x3") return 3 * 3;
-        if (preset === "4x4") return 4 * 4;
+        if (preset === "3x3") return 9;
+        if (preset === "4x4") return 16;
         return Number(rows) * Number(cols) || 9;
     };
 
@@ -492,7 +491,6 @@ const DownloadPdf = ({ productsToExport }) => {
                 chunks.push(effectiveProducts.slice(i, i + itemsPerPage));
             }
 
-            // ----- fetch watermark once as data URL (reduces CORS/taint issues) -----
             const fetchWatermarkDataUrl = async () => {
                 try {
                     const resp = await fetch(WATERMARK_URL, { mode: "cors" });
@@ -512,16 +510,17 @@ const DownloadPdf = ({ productsToExport }) => {
 
             const watermarkDataUrl = await fetchWatermarkDataUrl();
             if (!watermarkDataUrl) {
-                // not fatal — we'll try using the direct URL as fallback
                 console.warn("Watermark data URL not available, fallback to WATERMARK_URL");
             }
-            // -----------------------------------------------------------------------
 
             const pdf = new jsPDF("p", "mm", "a4");
             const pageWidth = pdf.internal.pageSize.getWidth();
             const pageHeight = pdf.internal.pageSize.getHeight();
 
-            const columns = preset === "3x3" ? 3 : preset === "4x4" ? 4 : Number(cols) || 3;
+            const columns =
+                preset === "3x3" ? 3 :
+                    preset === "4x4" ? 4 :
+                        Number(cols) || 3;
 
             for (let pageIndex = 0; pageIndex < chunks.length; pageIndex++) {
                 const pageItems = chunks[pageIndex];
@@ -539,9 +538,22 @@ const DownloadPdf = ({ productsToExport }) => {
                 wrapper.style.zIndex = "99999";
                 wrapper.style.fontFamily = "Arial, Helvetica, sans-serif";
 
+                // 🔹 HEADER + CATEGORY TITLE
                 const header = document.createElement("div");
-                header.innerHTML = `<h1 style="margin:0;font-size:34px;color:#003b7a;text-align:center;font-weight:700;">Sarjan<span style="font-size:12px;vertical-align:super">®</span></h1>
-          <p style="margin:6px 0 18px;text-align:center;font-size:11px;color:#666;letter-spacing:2px">The Creation Of Creativity</p>`;
+                header.innerHTML = `
+                    <h1 style="margin:0;font-size:34px;color:#003b7a;text-align:center;font-weight:700;">
+                        Sarjan<span style="font-size:12px;vertical-align:super">®</span>
+                    </h1>
+                    <p style="margin:6px 0 6px;text-align:center;font-size:11px;color:#666;letter-spacing:2px">
+                        The Creation Of Creativity
+                    </p>
+                    ${selectedCategory
+                        ? `<p style="margin:0 0 18px;text-align:center;font-size:12px;color:#0f3b6a;font-weight:700;">
+                                 ${selectedCategory}${selectedSub ? " • " + selectedSub : ""}
+                               </p>`
+                        : ""
+                    }
+                `;
                 wrapper.appendChild(header);
 
                 const grid = document.createElement("div");
@@ -566,7 +578,7 @@ const DownloadPdf = ({ productsToExport }) => {
                     imgWrap.style.border = "4px solid #1c3f7a";
                     imgWrap.style.boxSizing = "border-box";
                     imgWrap.style.background = "#fff";
-                    imgWrap.style.position = "relative"; // Needed for overlay
+                    imgWrap.style.position = "relative";
 
                     const img = document.createElement("img");
 
@@ -597,9 +609,7 @@ const DownloadPdf = ({ productsToExport }) => {
                     img.style.objectFit = "cover";
                     imgWrap.appendChild(img);
 
-                    // ⭐⭐⭐ ADD WATERMARK OVERLAY ⭐⭐⭐
                     const wm = document.createElement("img");
-                    // set crossOrigin before src so html2canvas can use it without tainting
                     wm.crossOrigin = "anonymous";
                     wm.alt = "watermark";
                     wm.style.position = "absolute";
@@ -610,13 +620,9 @@ const DownloadPdf = ({ productsToExport }) => {
                     wm.style.maxWidth = "120px";
                     wm.style.pointerEvents = "none";
                     wm.style.userSelect = "none";
-                    wm.style.mixBlendMode = "normal";  // try "multiply" if you want darker effect
-                    // append to image wrapper (so watermark loads as part of wrapper)
-                    imgWrap.appendChild(wm);
-
-                    // set src after crossOrigin is set
+                    wm.style.mixBlendMode = "normal";
                     wm.src = WATERMARK_URL;
-
+                    imgWrap.appendChild(wm);
 
                     const info = document.createElement("div");
                     info.style.display = "flex";
@@ -645,7 +651,6 @@ const DownloadPdf = ({ productsToExport }) => {
                     card.appendChild(info);
                     grid.appendChild(card);
                 });
-
 
                 wrapper.appendChild(grid);
 
@@ -701,7 +706,12 @@ const DownloadPdf = ({ productsToExport }) => {
                 document.body.removeChild(wrapper);
             }
 
-            pdf.save("sarjan-catalog.pdf");
+            // 🔹 FILE NAME ME BHI CATEGORY ADD
+            const safeCat = selectedCategory
+                ? "-" + selectedCategory.replace(/[^a-z0-9]+/gi, "-").toLowerCase()
+                : "";
+            pdf.save(`sarjan-catalog${safeCat}.pdf`);
+
             showToast?.("PDF downloaded — check your Downloads folder.", "success");
         } catch (err) {
             console.error("PDF error:", err?.message || err);
@@ -711,6 +721,7 @@ const DownloadPdf = ({ productsToExport }) => {
         }
     };
 
+    // niche ka UI same hi rehne do (layout select + button)
     return (
         <>
             {isGenerating && (
@@ -722,9 +733,12 @@ const DownloadPdf = ({ productsToExport }) => {
                 </div>
             )}
 
-            <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2">
-                    <label className="text-sm">Layout:</label>
+            {/* 🔹 Top controls nice UI */}
+            <div className="w-full bg-white/95 rounded-xl border border-gray-200 shadow-sm px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+
+                {/* Left side – layout select */}
+                <div className="flex items-center flex-wrap gap-2">
+                    <span className="text-sm font-medium text-gray-700">Layout</span>
                     <select
                         value={preset}
                         onChange={(e) => {
@@ -735,11 +749,10 @@ const DownloadPdf = ({ productsToExport }) => {
                                 setRows(4); setCols(4);
                             }
                         }}
-                        className="border rounded px-2 py-1 text-sm"
+                        className="border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     >
                         <option value="3x3">3 × 3 (9 / page)</option>
                         <option value="4x4">4 × 4 (16 / page)</option>
-
                     </select>
 
                     {preset === "custom" && (
@@ -749,35 +762,41 @@ const DownloadPdf = ({ productsToExport }) => {
                                 min="1"
                                 value={rows}
                                 onChange={(e) => setRows(Number(e.target.value))}
-                                className="w-14 px-2 py-1 border rounded text-sm"
+                                className="w-16 px-2 py-1.5 border rounded-lg text-sm"
                                 placeholder="rows"
                             />
-                            <span className="text-sm">×</span>
+                            <span className="text-sm text-gray-500">×</span>
                             <input
                                 type="number"
                                 min="1"
                                 value={cols}
                                 onChange={(e) => setCols(Number(e.target.value))}
-                                className="w-14 px-2 py-1 border rounded text-sm"
+                                className="w-16 px-2 py-1.5 border rounded-lg text-sm"
                                 placeholder="cols"
                             />
                         </>
                     )}
                 </div>
 
-                <div className="flex-1" />
-
+                {/* Right side – button */}
                 <button
                     onClick={handleDownload}
                     disabled={isGenerating}
-                    className={`px-5 py-2 rounded-lg text-white text-sm font-semibold shadow-md transition duration-200 ${isGenerating ? "bg-blue-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"}`}
+                    className={`w-full sm:w-auto px-5 py-2.5 rounded-lg text-sm font-semibold shadow-md transition ${isGenerating
+                        ? "bg-blue-400 cursor-not-allowed text-white"
+                        : "bg-blue-600 hover:bg-blue-700 text-white"
+                        }`}
                 >
-                    {isGenerating ? "Generating..." : `Download Catalog PDF (${computeItemsPerPage()} / page)`}
+                    {isGenerating
+                        ? "Generating..."
+                        : `Download Catalog PDF (${computeItemsPerPage()} / page)`}
                 </button>
             </div>
         </>
     );
+
 };
+
 
 
 
@@ -856,52 +875,66 @@ const Home = () => {
         <main className="min-h-screen bg-gray-100 flex justify-center py-5 sm:py-10 px-0 sm:px-4">
             <div className="flex flex-col items-center w-full max-w-2xl">
                 <div className="mb-4 sm:mb-8 w-full max-w-[595px] px-4 sm:px-0">
-                    <DownloadPdf productsToExport={filtered} />
+                    <DownloadPdf
+                        productsToExport={filtered}
+                        selectedCategory={selectedCategory}
+                        selectedSub={selectedSub}
+                    />
                 </div>
+
 
                 {/* Filters + Loading */}
                 <div className="w-full max-w-[595px] mb-4 px-4 sm:px-0">
-                    <div className="flex gap-2 items-center mb-3">
-                        {/* CATEGORY DROPDOWN */}
-                        <select
-                            value={selectedCategory}
-                            onChange={(e) => {
-                                const value = e.target.value; // "" ya category name
-                                setSelectedCategory(value);
-                                setSelectedSub("");
-                                setFilters({ category: value, subcategory: "" });
-                            }}
-                            className="border rounded px-3 py-2 text-sm"
-                        >
-                            <option value="">All Categories</option>
-                            {categories.map((c) => (
-                                <option key={c.id} value={c.name}>
-                                    {c.name}
-                                </option>
-                            ))}
-                        </select>
+                    <div className="w-full flex flex-col sm:flex-row gap-3 items-center mb-4">
 
-                        {/* SUBCATEGORY DROPDOWN */}
-                        <select
-                            value={selectedSub}
-                            onChange={(e) => {
-                                const value = e.target.value;
-                                setSelectedSub(value);
-                                setFilters((prev) => ({ ...prev, subcategory: value }));
-                            }}
-                            className="border rounded px-3 py-2 text-sm"
-                            disabled={!selectedCategory}
-                        >
-                            <option value="">All Subcategories</option>
-                            {(categories.find((c) => c.name === selectedCategory)?.sub || []).map(
-                                (s) => (
+                        {/* Category Dropdown */}
+                        <div className="w-full sm:w-auto">
+                            <select
+                                value={selectedCategory}
+                                onChange={(e) => {
+                                    const value = e.target.value;
+                                    setSelectedCategory(value);
+                                    setSelectedSub("");
+                                    setFilters({ category: value, subcategory: "" });
+                                }}
+                                className="w-full min-w-[150px] border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white shadow-sm 
+                 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                            >
+                                <option value="">All Categories</option>
+                                {categories.map((c) => (
+                                    <option key={c.id} value={c.name}>
+                                        {c.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* Subcategory Dropdown */}
+                        <div className="w-full sm:w-auto">
+                            <select
+                                value={selectedSub}
+                                onChange={(e) => {
+                                    const value = e.target.value;
+                                    setSelectedSub(value);
+                                    setFilters((prev) => ({ ...prev, subcategory: value }));
+                                }}
+                                className={`w-full min-w-[150px] border rounded-lg px-3 py-2 text-sm shadow-sm transition
+                 ${selectedCategory
+                                        ? "bg-white border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        : "bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed"
+                                    }`}
+                                disabled={!selectedCategory}
+                            >
+                                <option value="">All Subcategories</option>
+                                {(categories.find((c) => c.name === selectedCategory)?.sub || []).map((s) => (
                                     <option key={s.id} value={s.name}>
                                         {s.name}
                                     </option>
-                                )
-                            )}
-                        </select>
+                                ))}
+                            </select>
+                        </div>
                     </div>
+
 
                     {loading ? (
                         <div className="w-full flex items-center justify-center py-8">
@@ -926,10 +959,20 @@ const Home = () => {
                                 <h1 className="text-[30px] sm:text-[34px] font-bold tracking-wider text-[#003b7a] leading-[1] inline-block">
                                     Sarjan<span className="text-xs sm:text-sm align-super">®</span>
                                 </h1>
+
                                 <p className="text-[10px] sm:text-[11px] tracking-[2px] text-gray-700 uppercase">
                                     The Creation Of Creativity
                                 </p>
+
+                                {/* 🔹 Current selected Category + Subcategory line */}
+                                {(selectedCategory || selectedSub) && (
+                                    <p className="mt-1 text-[11px] sm:text-[12px] font-semibold text-[#003b7a]">
+                                        {selectedCategory || "All Categories"}
+                                        {selectedSub ? ` • ${selectedSub}` : ""}
+                                    </p>
+                                )}
                             </div>
+
 
                             {/* product grid shows filtered */}
                             <div className="grid grid-cols-3 gap-x-2 gap-y-6 sm:gap-x-8 sm:gap-y-10 w-full">
@@ -1750,6 +1793,31 @@ const AddProduct = () => {
                         ))}
                     </select>
                 </div>
+                <div className="mt-3">
+                    <label htmlFor="subcategory" className="text-sm font-medium mb-1 block">
+                        Subcategory
+                    </label>
+                    <select
+                        id="subcategory"
+                        name="subcategory"
+                        value={form.subcategory}
+                        onChange={handleChange}
+                        disabled={!form.category || availableSubcats.length === 0}
+                        className="border border-gray-300 rounded-lg px-4 py-2 text-base focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 transition w-full"
+                    >
+                        <option value="">
+                            {form.category ? "Select subcategory (optional)" : "Select category first"}
+                        </option>
+                        {availableSubcats.map((s) => (
+                            <option key={s} value={s}>
+                                {s}
+                            </option>
+                        ))}
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">
+                        Choose subcategory if available (optional).
+                    </p>
+                </div>
 
                 {/* Image URL + Upload (span 3 cols) */}
                 <div className="flex flex-col md:col-span-3">
@@ -1792,31 +1860,7 @@ const AddProduct = () => {
                     </div>
 
                     {/* Subcategory select (shows when category selected) */}
-                    <div className="mt-3">
-                        <label htmlFor="subcategory" className="text-sm font-medium mb-1 block">
-                            Subcategory
-                        </label>
-                        <select
-                            id="subcategory"
-                            name="subcategory"
-                            value={form.subcategory}
-                            onChange={handleChange}
-                            disabled={!form.category || availableSubcats.length === 0}
-                            className="border border-gray-300 rounded-lg px-4 py-2 text-base focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 transition w-full"
-                        >
-                            <option value="">
-                                {form.category ? "Select subcategory (optional)" : "Select category first"}
-                            </option>
-                            {availableSubcats.map((s) => (
-                                <option key={s} value={s}>
-                                    {s}
-                                </option>
-                            ))}
-                        </select>
-                        <p className="text-xs text-gray-500 mt-1">
-                            Choose subcategory if available (optional).
-                        </p>
-                    </div>
+
                 </div>
 
                 <div className="md:col-span-1 flex items-end justify-start md:justify-end">
@@ -1967,14 +2011,14 @@ const AdminDashboard = () => {
                     </div>
 
                     <div className="flex items-center gap-3">
-                        <button
+                        {/* <button
                             onClick={() => setView("manage-categories")}
                             className="px-4 py-2 bg-yellow-500 text-white rounded-lg font-semibold shadow hover:bg-yellow-600 transition"
                         >
                             Manage Categories
-                        </button>
+                        </button> */}
 
-                        <DownloadPdf />
+                        {/* <DownloadPdf /> */}
                     </div>
                 </header>
 
