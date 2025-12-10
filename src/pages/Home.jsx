@@ -1433,7 +1433,6 @@ const ManageCategoriesPage = () => {
                                         <div className="flex items-center gap-2">
                                             <button
                                                 onClick={() => {
-                                                    // सिर्फ़ category select करो — page मत बदलना
                                                     setSelectedCatId(c.id);
                                                 }}
                                                 className="text-sm text-blue-600 px-2 py-1 rounded hover:bg-blue-50"
