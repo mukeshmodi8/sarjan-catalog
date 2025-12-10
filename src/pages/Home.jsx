@@ -32,6 +32,8 @@ const ProductProvider = ({ children }) => {
     const [toast, setToast] = useState({ message: "", type: "", id: null });
     const [view, setView] = useState("home");
     const [loading, setLoading] = useState(false);
+
+    // 🔹 filters ko localStorage se load karo
     const [filters, setFilters] = useState(() => {
         try {
             const raw = localStorage.getItem("sarjan_filters");
@@ -41,7 +43,7 @@ const ProductProvider = ({ children }) => {
         }
     });
 
-
+    // 🔹 categories ko localStorage se load karo
     const [categories, setCategories] = useState(() => {
         try {
             const raw = localStorage.getItem("sarjan_categories");
@@ -56,11 +58,49 @@ const ProductProvider = ({ children }) => {
         localStorage.setItem("sarjan_categories", JSON.stringify(next));
     };
 
-    // toast helper unchanged
-    const showToast = (message, type = "success") => {
-        setToast({ message, type, id: Date.now() });
-        setTimeout(() => setToast({ message: "", type: "", id: null }), 3000);
+    // 🔥 NEW: products se categories/subcategories auto-generate
+    const syncCategoriesFromProducts = (prods) => {
+        let next = [...categories];
+        let changed = false;
+
+        prods.forEach((p) => {
+            if (!p.category) return;
+
+            // category exist?
+            let cat = next.find((c) => c.name === p.category);
+            if (!cat) {
+                cat = {
+                    id: `${p.category}-${Date.now()}-${Math.random()
+                        .toString(16)
+                        .slice(2)}`,
+                    name: p.category,
+                    sub: [],
+                };
+                next.push(cat);
+                changed = true;
+            }
+
+            // subcategory
+            if (p.subcategory) {
+                const hasSub = cat.sub.some((s) => s.name === p.subcategory);
+                if (!hasSub) {
+                    cat.sub.push({
+                        id: `${p.category}-${p.subcategory}-${Date.now()}-${Math.random()
+                            .toString(16)
+                            .slice(2)}`,
+                        name: p.subcategory,
+                    });
+                    changed = true;
+                }
+            }
+        });
+
+        if (changed) {
+            persistCategories(next);
+        }
     };
+
+    // 🔹 filters ko localStorage me save karo jab bhi change ho
     useEffect(() => {
         try {
             localStorage.setItem("sarjan_filters", JSON.stringify(filters));
@@ -69,13 +109,18 @@ const ProductProvider = ({ children }) => {
         }
     }, [filters]);
 
+    // 🔹 products fetch + categories sync
     useEffect(() => {
         const fetchProducts = async () => {
             try {
                 setLoading(true);
                 const res = await axios.get(`${API_BASE}/products`);
                 const mapped = res.data.map((p) => ({ ...p, id: p._id }));
+
                 setProducts(mapped);
+
+                // 🔥 yahan se products ke basis pe categories auto-generate / sync
+                syncCategoriesFromProducts(mapped);
             } catch (err) {
                 console.error("Fetch products error:", err?.message || err);
                 showToast("Failed to load products.", "error");
@@ -85,9 +130,17 @@ const ProductProvider = ({ children }) => {
         };
 
         fetchProducts();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // Category helpers (client-side)
+
+    // toast helper
+    const showToast = (message, type = "success") => {
+        setToast({ message, type, id: Date.now() });
+        setTimeout(() => setToast({ message: "", type: "", id: null }), 3000);
+    };
+
+    // Category helpers
     const addCategory = (name) => {
         if (!name) return;
         if (categories.find((c) => c.name === name)) {
@@ -98,21 +151,6 @@ const ProductProvider = ({ children }) => {
         persistCategories(next);
         showToast("Category added.", "success");
     };
-    // ------------ add this inside ProductProvider (near updateProduct) ------------
-    const addProduct = async (product) => {
-        try {
-            const res = await axios.post(`${API_BASE}/products`, product);
-            const saved = res.data;
-            // ensure saved has _id from server
-            setProducts((prev) => [...prev, { ...saved, id: saved._id }]);
-            showToast(`Product ${product.model} added successfully.`, "success");
-        } catch (err) {
-            console.error("Add product error:", err?.message || err);
-            showToast("Failed to add product.", "error");
-        }
-    };
-    // -----------------------------------------------------------------------------
-
 
     const deleteCategory = (id) => {
         const next = categories.filter((c) => c.id !== id);
@@ -123,7 +161,9 @@ const ProductProvider = ({ children }) => {
     const addSubcategory = (catId, subName) => {
         if (!subName) return;
         const next = categories.map((c) =>
-            c.id === catId ? { ...c, sub: [...c.sub, { id: Date.now().toString(), name: subName }] } : c
+            c.id === catId
+                ? { ...c, sub: [...c.sub, { id: Date.now().toString(), name: subName }] }
+                : c
         );
         persistCategories(next);
         showToast("Subcategory added.", "success");
@@ -131,60 +171,30 @@ const ProductProvider = ({ children }) => {
 
     const deleteSubcategory = (catId, subId) => {
         const next = categories.map((c) =>
-            c.id === catId ? { ...c, sub: c.sub.filter((s) => s.id !== subId) } : c
+            c.id === catId
+                ? { ...c, sub: c.sub.filter((s) => s.id !== subId) }
+                : c
         );
         persistCategories(next);
         showToast("Subcategory removed.", "error");
     };
 
-    // add / update / delete product unchanged except ensure category/subcategory preserved
-    const ProductCard = ({ product }) => {
-        return (
-            <div className="w-full flex flex-col items-center">
-                <div className="relative rounded-[22px] overflow-hidden border-[4px] border-[#1c3f7a] bg-white w-full shadow-md">
-                    <div className="w-full aspect-[3/4]">
-                        <img
-                            src={resolveImageUrl(product.image)}
-                            alt={product.model}
-                            className="w-full h-full object-cover block"
-                            draggable={false}
-                        />
-                    </div>
+    // 🔹 addProduct server + state
+    const addProduct = async (product) => {
+        try {
+            const res = await axios.post(`${API_BASE}/products`, product);
+            const saved = res.data;
+            setProducts((prev) => [...prev, { ...saved, id: saved._id }]);
 
-                    {/* Watermark overlay */}
-                    <img
-                        src={WATERMARK_URL}
-                        alt="watermark"
-                        draggable={false}
-                        className="pointer-events-none select-none absolute right-2 bottom-2 opacity-80"
-                        style={{
-                            width: "28%",         // tweak as needed
-                            maxWidth: "120px",
-                            mixBlendMode: "normal" // or "multiply" if you prefer darker overlay
-                        }}
-                    />
-                </div>
+            // naya product aaya → categories sync
+            syncCategoriesFromProducts([saved]);
 
-                {/* Model + Price */}
-                <div className="w-full text-center mt-2">
-                    <p className="text-[12px] font-bold text-[#0f3b6a] leading-tight">
-                        <span className="font-extrabold">{product.model}</span>
-                    </p>
-
-                    <p className="text-[12px] font-bold text-[#0f3b6a] leading-tight mt-0.5">
-                        ₹.<span className="font-extrabold">{product.price}</span>/-</p>
-
-                    {(product.category || product.subcategory) && (
-                        <p className="text-[11px] text-gray-600 mt-1 font-medium">
-                            {product.category || ""}{product.category && product.subcategory ? " • " : ""}{product.subcategory || ""}
-                        </p>
-                    )}
-                </div>
-            </div>
-        );
+            showToast(`Product ${product.model} added successfully.`, "success");
+        } catch (err) {
+            console.error("Add product error:", err?.message || err);
+            showToast("Failed to add product.", "error");
+        }
     };
-
-
 
     const updateProduct = async (updatedProduct) => {
         try {
@@ -195,7 +205,6 @@ const ProductProvider = ({ children }) => {
                 price: updatedProduct.price,
                 image: updatedProduct.image,
                 stock: updatedProduct.stock,
-                // include category/subcategory (if present)
                 category: updatedProduct.category || "",
                 subcategory: updatedProduct.subcategory || "",
             };
@@ -206,6 +215,9 @@ const ProductProvider = ({ children }) => {
             setProducts((prev) =>
                 prev.map((p) => (p.id === id ? { ...saved, id: saved._id } : p))
             );
+
+            // update ke baad bhi categories ko align rakho
+            syncCategoriesFromProducts([saved]);
 
             showToast(`Product ${updatedProduct.model} updated.`);
         } catch (err) {
@@ -264,6 +276,7 @@ const ProductProvider = ({ children }) => {
         </ProductContext.Provider>
     );
 };
+
 
 
 const useProducts = () => useContext(ProductContext);
@@ -421,10 +434,17 @@ const CatalogView = () => {
     return (
         <div id="catalog-page" className="sr-only">
             <div className="w-[595px] h-fit p-10 bg-white flex flex-col items-center relative">
-                <div className="text-center mb-8 w-full">
+                <div className="text-center mb-8 w-full flex flex-col items-center">
+                    <img
+                        src={WATERMARK_URL}
+                        alt="Sarjan Logo"
+                        className="w-16 h-16 mb-3 opacity-90"
+                    />
+
                     <h1 className="text-[34px] font-bold tracking-wider text-[#003b7a] leading-[1] inline-block">
                         Sarjan<span className="text-sm align-super">®</span>
                     </h1>
+
                     <p className="text-[11px] tracking-[2px] text-gray-700 uppercase mb-6">
                         The Creation Of Creativity
                     </p>
@@ -452,10 +472,33 @@ const CatalogView = () => {
                     ))}
                 </div>
 
-                <div className="absolute bottom-0 left-0 right-0 bg-[#003b7a] text-white flex justify-between items-center px-10 py-1 text-[13px] w-[595px] mt-10">
-                    <span>📞 +91 9898803407</span>
-                    <span>🌍 www.sarjanindustries.com</span>
+                <div className="absolute bottom-0 left-0 right-0 bg-[#003b7a] text-white px-6 py-3 w-[595px]">
+                    <div className="flex flex-col items-center text-center gap-1">
+                        {/* Title */}
+                        <div className="font-semibold tracking-[0.18em] text-xs">
+                            SARJAN INDUSTRIES
+                        </div>
+
+                        {/* Icons row */}
+                        <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-1 text-[11px]">
+                            <div className="flex items-center gap-1">
+                                <span>🌐</span>
+                                <span>www.sarjanindustries.com</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                                <span>📞</span>
+                                <span>+91 9898803407</span>
+                            </div>
+                        </div>
+
+                        {/* Address line */}
+                        <div className="text-[10px] opacity-90 leading-snug">
+                            S.no. 1241/1, Village : Aghar, Ta. : Saraswati Patan Deesa State Highway
+                            Dist. : Gujarat 384285
+                        </div>
+                    </div>
                 </div>
+
             </div>
         </div>
     );
@@ -656,15 +699,27 @@ const DownloadPdf = ({ productsToExport, selectedCategory, selectedSub }) => {
 
                 const footer = document.createElement("div");
                 footer.style.marginTop = "18px";
-                footer.style.display = "flex";
-                footer.style.justifyContent = "space-between";
-                footer.style.alignItems = "center";
                 footer.style.background = "#003b7a";
-                footer.style.color = "white";
-                footer.style.padding = "6px 12px";
-                footer.style.fontSize = "12px";
-                footer.innerHTML = `<span>📞 +91 9898803407</span><span>🌍 www.sarjanindustries.com</span>`;
+                footer.style.color = "#ffffff";
+                footer.style.padding = "10px 18px";
+                footer.style.fontFamily = "Arial, Helvetica, sans-serif";
+                footer.style.textAlign = "center";
+
+                footer.innerHTML = `
+  <div style="font-weight:700; letter-spacing:3px; font-size:11px; margin-bottom:4px;">
+    SARJAN INDUSTRIES
+  </div>
+  <div style="display:flex; justify-content:center; gap:30px; font-size:10px; margin-bottom:3px;">
+    <span>🌐 www.sarjanindustries.com</span>
+    <span>📞 +91 9898803407</span>
+  </div>
+  <div style="font-size:9px; opacity:0.9;">
+    S.no. 1241/1, Village : Aghar, Ta. : Saraswati Patan Deesa State Highway Dist. : Gujarat 384285
+  </div>
+`;
+
                 wrapper.appendChild(footer);
+
 
                 document.body.appendChild(wrapper);
 
@@ -948,13 +1003,14 @@ const Home = () => {
                     ) : (
                         <div
                             id="catalog-page-main"
-                            className="w-full min-h-[700px] max-w-[595px] bg-white rounded-md shadow-2xl relative px-4 sm:px-8 py-8 overflow-hidden"
+                            className="w-full min-h-[700px] max-w-[595px] bg-white rounded-md shadow-2xl relative px-4 sm:px-8 pt-8 pb-24"
                             style={{
                                 backgroundImage:
                                     "repeating-linear-gradient(45deg, #ededed 0, #ededed 1px, transparent 1px, transparent 30px), repeating-linear-gradient(-45deg, #ededed 0, #ededed 1px, transparent 1px, transparent 30px)",
                                 backgroundSize: "30px 30px",
                             }}
                         >
+
                             <div className="mb-6 pl-1 text-center">
                                 <h1 className="text-[30px] sm:text-[34px] font-bold tracking-wider text-[#003b7a] leading-[1] inline-block">
                                     Sarjan<span className="text-xs sm:text-sm align-super">®</span>
@@ -985,10 +1041,30 @@ const Home = () => {
                                 )}
                             </div>
 
-                            <div className="absolute bottom-0 left-0 right-0 bg-[#003b7a] text-white flex justify-between items-center px-6 sm:px-10 py-1 text-[11px] sm:text-[13px] w-full">
-                                <span>📞 +91 9898803407</span>
-                                <span>🌍 www.sarjanindustries.com</span>
+                            <div className="absolute bottom-0 left-0 right-0 bg-[#003b7a] h text-white px-6 sm:px-10 py-4 w-full">
+                                <div className="flex flex-col items-center text-center gap-1">
+                                    <div className="font-semibold tracking-[0.18em] text-[11px] sm:text-xs">
+                                        SARJAN INDUSTRIES
+                                    </div>
+
+                                    <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-1 text-[10px] sm:text-[11px]">
+                                        <div className="flex items-center gap-1">
+                                            <span>🌐</span>
+                                            <span>www.sarjanindustries.com</span>
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                            <span>📞</span>
+                                            <span>+91 9898803407</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="text-[9px] sm:text-[10px] opacity-90 leading-snug">
+                                        S.no. 1241/1, Village : Aghar, Ta. : Saraswati Patan Deesa State Highway
+                                        Dist. : Gujarat 384285
+                                    </div>
+                                </div>
                             </div>
+
                         </div>
                     )}
                 </div>
