@@ -308,6 +308,8 @@ const AddProduct = () => {
       price: Number(form.price),
       image: form.image,
       stock: Number(form.stock) || 0,
+      category: form.category || "",
+      subcategory: form.subcategory || "",
     });
 
     setForm({
@@ -315,6 +317,8 @@ const AddProduct = () => {
       price: "",
       image: "",
       stock: 0,
+      category: "",
+      subcategory: "",
     });
   };
 
@@ -527,7 +531,7 @@ const AdminDashboard = () => {
             Manage all products in your catalog.
           </p>
         </header>
-
+        <CategoriesManager />
         <AddProduct />
         <ProductList />
       </div>

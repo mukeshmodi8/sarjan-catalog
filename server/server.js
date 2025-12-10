@@ -41,16 +41,17 @@ if (!fs.existsSync(uploadPath)) {
 // ----- MIDDLEWARE -----
 app.use(express.json());
 
-// ⚠️ CORS में FRONTEND का URL डालो, backend का नहीं
 app.use(
   cors({
     origin: [
       "http://localhost:5173",
-      "https://sarjan-catalog-1.onrender.com"   // <-- यहीं डालना था
+      "http://localhost:5174",               // ← यहाँ add करिए
+      "https://sarjan-catalog-1.onrender.com"
     ],
     credentials: true,
   })
 );
+
 
 
 // ----- STATIC -----

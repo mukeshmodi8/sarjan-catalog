@@ -5,8 +5,7 @@ const ProductCard = ({ product }) => {
     <div className="w-[150px]">
 
       <div className="rounded-[22px] overflow-hidden border-[4px] border-[#1c3f7a] bg-white">
-      // जहां भी image है वहां h-[170px] को बदलकर:
-
+     
         <img
           src={product.image}
           alt={product.model}

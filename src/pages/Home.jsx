@@ -1,14 +1,9 @@
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas-pro";
-import React, {
-    useState,
-    useContext,
-    createContext,
-    useMemo,
-    useEffect,
-} from "react";
+import React, { useState, useContext, createContext, useMemo, useEffect } from "react";
 import axios from "axios";
 
+// 먼저 API_BASE 선언
 const getApiBase = () => {
     if (
         typeof window !== "undefined" &&
@@ -21,18 +16,39 @@ const getApiBase = () => {
 };
 
 const API_BASE = getApiBase();
+const IMAGE_PROXY_BASE = API_BASE;
 const ADMIN_EMAIL = "admin123@gmail.com";
 const ADMIN_PASSWORD = "123456";
-const IMAGE_PROXY_BASE = API_BASE;
+
+const WATERMARK_URL = "/watermark.png";
+
 
 const ProductContext = createContext();
+
+
 
 const ProductProvider = ({ children }) => {
     const [products, setProducts] = useState([]);
     const [toast, setToast] = useState({ message: "", type: "", id: null });
     const [view, setView] = useState("home");
     const [loading, setLoading] = useState(false);
+    const [filters, setFilters] = useState({ category: "", subcategory: "" });
 
+    const [categories, setCategories] = useState(() => {
+        try {
+            const raw = localStorage.getItem("sarjan_categories");
+            return raw ? JSON.parse(raw) : [];
+        } catch {
+            return [];
+        }
+    });
+
+    const persistCategories = (next) => {
+        setCategories(next);
+        localStorage.setItem("sarjan_categories", JSON.stringify(next));
+    };
+
+    // toast helper unchanged
     const showToast = (message, type = "success") => {
         setToast({ message, type, id: Date.now() });
         setTimeout(() => setToast({ message: "", type: "", id: null }), 3000);
@@ -56,17 +72,104 @@ const ProductProvider = ({ children }) => {
         fetchProducts();
     }, []);
 
+    // Category helpers (client-side)
+    const addCategory = (name) => {
+        if (!name) return;
+        if (categories.find((c) => c.name === name)) {
+            showToast("Category already exists.", "error");
+            return;
+        }
+        const next = [...categories, { id: Date.now().toString(), name, sub: [] }];
+        persistCategories(next);
+        showToast("Category added.", "success");
+    };
+    // ------------ add this inside ProductProvider (near updateProduct) ------------
     const addProduct = async (product) => {
         try {
             const res = await axios.post(`${API_BASE}/products`, product);
             const saved = res.data;
+            // ensure saved has _id from server
             setProducts((prev) => [...prev, { ...saved, id: saved._id }]);
-            showToast(`Product ${product.model} added successfully.`);
+            showToast(`Product ${product.model} added successfully.`, "success");
         } catch (err) {
             console.error("Add product error:", err?.message || err);
             showToast("Failed to add product.", "error");
         }
     };
+    // -----------------------------------------------------------------------------
+
+
+    const deleteCategory = (id) => {
+        const next = categories.filter((c) => c.id !== id);
+        persistCategories(next);
+        showToast("Category removed.", "error");
+    };
+
+    const addSubcategory = (catId, subName) => {
+        if (!subName) return;
+        const next = categories.map((c) =>
+            c.id === catId ? { ...c, sub: [...c.sub, { id: Date.now().toString(), name: subName }] } : c
+        );
+        persistCategories(next);
+        showToast("Subcategory added.", "success");
+    };
+
+    const deleteSubcategory = (catId, subId) => {
+        const next = categories.map((c) =>
+            c.id === catId ? { ...c, sub: c.sub.filter((s) => s.id !== subId) } : c
+        );
+        persistCategories(next);
+        showToast("Subcategory removed.", "error");
+    };
+
+    // add / update / delete product unchanged except ensure category/subcategory preserved
+    const ProductCard = ({ product }) => {
+        return (
+            <div className="w-full flex flex-col items-center">
+                <div className="relative rounded-[22px] overflow-hidden border-[4px] border-[#1c3f7a] bg-white w-full shadow-md">
+                    <div className="w-full aspect-[3/4]">
+                        <img
+                            src={resolveImageUrl(product.image)}
+                            alt={product.model}
+                            className="w-full h-full object-cover block"
+                            draggable={false}
+                        />
+                    </div>
+
+                    {/* Watermark overlay */}
+                    <img
+                        src={WATERMARK_URL}
+                        alt="watermark"
+                        draggable={false}
+                        className="pointer-events-none select-none absolute right-2 bottom-2 opacity-80"
+                        style={{
+                            width: "28%",         // tweak as needed
+                            maxWidth: "120px",
+                            mixBlendMode: "normal" // or "multiply" if you prefer darker overlay
+                        }}
+                    />
+                </div>
+
+                {/* Model + Price */}
+                <div className="w-full text-center mt-2">
+                    <p className="text-[12px] font-bold text-[#0f3b6a] leading-tight">
+                        <span className="font-extrabold">{product.model}</span>
+                    </p>
+
+                    <p className="text-[12px] font-bold text-[#0f3b6a] leading-tight mt-0.5">
+                        ₹.<span className="font-extrabold">{product.price}</span>/-</p>
+
+                    {(product.category || product.subcategory) && (
+                        <p className="text-[11px] text-gray-600 mt-1 font-medium">
+                            {product.category || ""}{product.category && product.subcategory ? " • " : ""}{product.subcategory || ""}
+                        </p>
+                    )}
+                </div>
+            </div>
+        );
+    };
+
+
 
     const updateProduct = async (updatedProduct) => {
         try {
@@ -77,6 +180,9 @@ const ProductProvider = ({ children }) => {
                 price: updatedProduct.price,
                 image: updatedProduct.image,
                 stock: updatedProduct.stock,
+                // include category/subcategory (if present)
+                category: updatedProduct.category || "",
+                subcategory: updatedProduct.subcategory || "",
             };
 
             const res = await axios.put(`${API_BASE}/products/${id}`, payload);
@@ -126,8 +232,15 @@ const ProductProvider = ({ children }) => {
             view,
             setView,
             loading,
+            categories,
+            addCategory,
+            deleteCategory,
+            addSubcategory,
+            deleteSubcategory,
+            filters,
+            setFilters,
         }),
-        [products, toast, view, loading]
+        [products, toast, view, loading, categories]
     );
 
     return (
@@ -136,6 +249,7 @@ const ProductProvider = ({ children }) => {
         </ProductContext.Provider>
     );
 };
+
 
 const useProducts = () => useContext(ProductContext);
 
@@ -206,6 +320,16 @@ const Navbar = () => {
                         >
                             Admin
                         </div>
+                        {isAdmin && (
+                            <div
+                                onClick={() => handleNavClick("manage-categories")}
+                                className={`text-sm cursor-pointer ${isActive("manage-categories")}`}
+                            >
+                                Manage Categories
+                            </div>
+                        )}
+
+
 
                         <div
                             onClick={() => handleNavClick("register")}
@@ -250,43 +374,25 @@ const Navbar = () => {
                 {open && (
                     <div className="md:hidden pb-3 border-t border-gray-100">
                         <div className="flex flex-col space-y-2 pt-3">
-                            <div
-                                onClick={() => handleNavClick("home")}
-                                className={`text-sm px-2 cursor-pointer ${isActive("home")}`}
-                            >
-                                Front Page
-                            </div>
+                            <div onClick={() => handleNavClick("home")} className={`text-sm px-2 cursor-pointer ${isActive("home")}`}>Front Page</div>
+                            <div onClick={() => handleNavClick("admin")} className={`text-sm px-2 cursor-pointer ${isActive("admin")}`}>Admin</div>
 
-                            <div
-                                onClick={() => handleNavClick("admin")}
-                                className={`text-sm px-2 cursor-pointer ${isActive("admin")}`}
-                            >
-                                Admin
-                            </div>
+                            {/* show manage-categories link only if admin */}
+                            {isAdmin && (
+                                <div onClick={() => handleNavClick("manage-categories")} className={`text-sm px-2 cursor-pointer ${isActive("manage-categories")}`}>
+                                    Manage Categories
+                                </div>
+                            )}
 
-                            <div
-                                onClick={() => handleNavClick("register")}
-                                className={`text-sm px-2 cursor-pointer ${isActive("register")}`}
-                            >
-                                Register
-                            </div>
+                            <div onClick={() => handleNavClick("register")} className={`text-sm px-2 cursor-pointer ${isActive("register")}`}>Register</div>
 
                             {!isAdmin ? (
-                                <div
-                                    onClick={() => handleNavClick("login")}
-                                    className="text-sm px-2 text-blue-600 cursor-pointer"
-                                >
-                                    Admin Login
-                                </div>
+                                <div onClick={() => handleNavClick("login")} className="text-sm px-2 text-blue-600 cursor-pointer">Admin Login</div>
                             ) : (
-                                <button
-                                    onClick={handleLogout}
-                                    className="text-sm px-2 text-red-600 text-left"
-                                >
-                                    Logout
-                                </button>
+                                <button onClick={handleLogout} className="text-sm px-2 text-red-600 text-left">Logout</button>
                             )}
                         </div>
+
                     </div>
                 )}
             </div>
@@ -340,239 +446,324 @@ const CatalogView = () => {
     );
 };
 
-const DownloadPdf = () => {
-  const { products, showToast } = useProducts();
-  const [isGenerating, setIsGenerating] = useState(false);
+const DownloadPdf = ({ productsToExport }) => {
+    const { products: allProducts, showToast } = useProducts();
+    const [isGenerating, setIsGenerating] = useState(false);
 
-  const handleDownload = async () => {
-    try {
-      if (!products || products.length === 0) {
-        showToast?.("No products to export.", "error");
-        return;
-      }
+    // layout option state
+    const [preset, setPreset] = useState("3x3"); // "3x3" | "4x4" | "custom"
+    const [rows, setRows] = useState(3);
+    const [cols, setCols] = useState(3);
 
-      setIsGenerating(true);
+    const effectiveProducts = productsToExport ?? allProducts;
 
-      const itemsPerPage = 9;
-      const chunks = [];
-      for (let i = 0; i < products.length; i += itemsPerPage) {
-        chunks.push(products.slice(i, i + itemsPerPage));
-      }
+    const computeItemsPerPage = () => {
+        if (preset === "3x3") return 3 * 3;
+        if (preset === "4x4") return 4 * 4;
+        return Number(rows) * Number(cols) || 9;
+    };
 
-      const pdf = new jsPDF("p", "mm", "a4");
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-
-      for (let pageIndex = 0; pageIndex < chunks.length; pageIndex++) {
-        const pageItems = chunks[pageIndex];
-
-        if (pageIndex > 0) {
-          pdf.addPage();
-        }
-        const wrapper = document.createElement("div");
-        wrapper.style.width = "595px";
-        wrapper.style.padding = "32px";
-        wrapper.style.background = "#fff";
-        wrapper.style.boxSizing = "border-box";
-        wrapper.style.position = "fixed";
-        wrapper.style.left = "-9999px";
-        wrapper.style.top = "0";
-        wrapper.style.zIndex = "99999";
-        wrapper.style.fontFamily = "Arial, Helvetica, sans-serif";
-
-        const header = document.createElement("div");
-        header.innerHTML = `
-          <h1 style="margin:0;font-size:34px;color:#003b7a;text-align:center;font-weight:700;">
-            Sarjan<span style="font-size:12px;vertical-align:super">®</span>
-          </h1>
-          <p style="margin:6px 0 18px;text-align:center;font-size:11px;color:#666;letter-spacing:2px">
-            The Creation Of Creativity
-          </p>
-        `;
-        wrapper.appendChild(header);
-
-        const grid = document.createElement("div");
-        grid.style.display = "grid";
-        grid.style.gridTemplateColumns = "repeat(3, 1fr)";
-        grid.style.gap = "12px";
-
-        const serverOrigin = IMAGE_PROXY_BASE.replace(/\/api$/, "");
-
-        pageItems.forEach((p) => {
-          const card = document.createElement("div");
-          card.style.display = "flex";
-          card.style.flexDirection = "column";
-          card.style.alignItems = "center";
-
-          const imgWrap = document.createElement("div");
-          imgWrap.style.width = "100%";
-          imgWrap.style.aspectRatio = "3/4";
-          imgWrap.style.overflow = "hidden";
-          imgWrap.style.borderRadius = "18px";
-          imgWrap.style.border = "4px solid #1c3f7a";
-          imgWrap.style.boxSizing = "border-box";
-          imgWrap.style.background = "#fff";
-
-          const img = document.createElement("img");
-
-          let originalUrl = p.image || "";
-          if (originalUrl.startsWith("/uploads")) {
-            originalUrl = originalUrl;
-          } else if (originalUrl.startsWith(serverOrigin)) {
-            originalUrl = originalUrl;
-          } else {
-            originalUrl = originalUrl;
-          }
-
-          const proxied = `${IMAGE_PROXY_BASE}/image-proxy?url=${encodeURIComponent(
-            originalUrl
-          )}`;
-
-          img.crossOrigin = "anonymous";
-          img.referrerPolicy = "no-referrer";
-
-          img.onerror = function () {
-            try {
-              const fallback = resolveImageUrl(p.image);
-              if (fallback && fallback !== proxied) {
-                img.onerror = null;
-                img.src = fallback;
+    const handleDownload = async () => {
+        try {
+            if (!effectiveProducts || effectiveProducts.length === 0) {
+                showToast?.("No products to export.", "error");
                 return;
-              }
-            } catch (e) {}
-            img.src =
-              "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
-          };
+            }
 
-          img.src = proxied;
-          img.style.width = "100%";
-          img.style.height = "100%";
-          img.style.objectFit = "cover";
-          imgWrap.appendChild(img);
+            setIsGenerating(true);
+            const itemsPerPage = computeItemsPerPage();
+            const chunks = [];
+            for (let i = 0; i < effectiveProducts.length; i += itemsPerPage) {
+                chunks.push(effectiveProducts.slice(i, i + itemsPerPage));
+            }
 
-          // 🔥 YAHAN TEXT BLOCK CHANGE KIYA HAI
-          const info = document.createElement("div");
-          info.style.display = "flex";
-          info.style.flexDirection = "column";
-          info.style.alignItems = "center";
-          info.style.justifyContent = "center";
-          info.style.width = "100%";
-          info.style.marginTop = "6px";
-          info.style.fontSize = "11px";
-          info.style.color = "#0f3b6a";
-          info.style.fontWeight = "700";
-          info.style.lineHeight = "1.2";
-          info.style.textAlign = "center";
+            // ----- fetch watermark once as data URL (reduces CORS/taint issues) -----
+            const fetchWatermarkDataUrl = async () => {
+                try {
+                    const resp = await fetch(WATERMARK_URL, { mode: "cors" });
+                    if (!resp.ok) return null;
+                    const blob = await resp.blob();
+                    return await new Promise((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onload = () => resolve(reader.result);
+                        reader.onerror = reject;
+                        reader.readAsDataURL(blob);
+                    });
+                } catch (err) {
+                    console.warn("Watermark fetch error:", err);
+                    return null;
+                }
+            };
 
-          const line1 = document.createElement("span");
-          line1.innerHTML = `Model No. <span style="font-weight:800;">${p.model}</span>`;
+            const watermarkDataUrl = await fetchWatermarkDataUrl();
+            if (!watermarkDataUrl) {
+                // not fatal — we'll try using the direct URL as fallback
+                console.warn("Watermark data URL not available, fallback to WATERMARK_URL");
+            }
+            // -----------------------------------------------------------------------
 
-          const line2 = document.createElement("span");
-          line2.style.marginTop = "2px";
-          line2.innerHTML = `Rs.<span style="font-weight:800;">${p.price}</span>/-`;
+            const pdf = new jsPDF("p", "mm", "a4");
+            const pageWidth = pdf.internal.pageSize.getWidth();
+            const pageHeight = pdf.internal.pageSize.getHeight();
 
-          info.appendChild(line1);
-          info.appendChild(line2);
-          // 🔥 text block end
+            const columns = preset === "3x3" ? 3 : preset === "4x4" ? 4 : Number(cols) || 3;
 
-          card.appendChild(imgWrap);
-          card.appendChild(info);
-          grid.appendChild(card);
-        });
+            for (let pageIndex = 0; pageIndex < chunks.length; pageIndex++) {
+                const pageItems = chunks[pageIndex];
 
-        wrapper.appendChild(grid);
+                if (pageIndex > 0) pdf.addPage();
 
-        const footer = document.createElement("div");
-        footer.style.marginTop = "18px";
-        footer.style.display = "flex";
-        footer.style.justifyContent = "space-between";
-        footer.style.alignItems = "center";
-        footer.style.background = "#003b7a";
-        footer.style.color = "white";
-        footer.style.padding = "6px 12px";
-        footer.style.fontSize = "12px";
-        footer.innerHTML = `<span>📞 +91 9898803407</span><span>🌍 www.sarjanindustries.com</span>`;
-        wrapper.appendChild(footer);
+                const wrapper = document.createElement("div");
+                wrapper.style.width = "595px";
+                wrapper.style.padding = "28px";
+                wrapper.style.background = "#fff";
+                wrapper.style.boxSizing = "border-box";
+                wrapper.style.position = "fixed";
+                wrapper.style.left = "-9999px";
+                wrapper.style.top = "0";
+                wrapper.style.zIndex = "99999";
+                wrapper.style.fontFamily = "Arial, Helvetica, sans-serif";
 
-        document.body.appendChild(wrapper);
+                const header = document.createElement("div");
+                header.innerHTML = `<h1 style="margin:0;font-size:34px;color:#003b7a;text-align:center;font-weight:700;">Sarjan<span style="font-size:12px;vertical-align:super">®</span></h1>
+          <p style="margin:6px 0 18px;text-align:center;font-size:11px;color:#666;letter-spacing:2px">The Creation Of Creativity</p>`;
+                wrapper.appendChild(header);
 
-        await new Promise((r) => setTimeout(r, 150));
+                const grid = document.createElement("div");
+                grid.style.display = "grid";
+                grid.style.gridTemplateColumns = `repeat(${columns}, 1fr)`;
+                grid.style.gap = "12px";
 
-        const imgs = Array.from(wrapper.querySelectorAll("img"));
-        await Promise.all(
-          imgs.map(
-            (image) =>
-              new Promise((resolve) => {
-                if (image.complete && image.naturalHeight !== 0) return resolve();
-                image.onload = image.onerror = () => resolve();
-                setTimeout(() => resolve(), 10000);
-              })
-          )
-        );
+                const serverOrigin = IMAGE_PROXY_BASE.replace(/\/api$/, "");
 
-        const canvas = await html2canvas(wrapper, {
-          scale: 2,
-          useCORS: true,
-          allowTaint: false,
-          imageTimeout: 20000,
-        });
+                pageItems.forEach((p) => {
+                    const card = document.createElement("div");
+                    card.style.display = "flex";
+                    card.style.flexDirection = "column";
+                    card.style.alignItems = "center";
+                    card.style.position = "relative";
 
-        const imgData = canvas.toDataURL("image/png");
+                    const imgWrap = document.createElement("div");
+                    imgWrap.style.width = "100%";
+                    imgWrap.style.aspectRatio = "3/4";
+                    imgWrap.style.overflow = "hidden";
+                    imgWrap.style.borderRadius = "18px";
+                    imgWrap.style.border = "4px solid #1c3f7a";
+                    imgWrap.style.boxSizing = "border-box";
+                    imgWrap.style.background = "#fff";
+                    imgWrap.style.position = "relative"; // Needed for overlay
 
-        const ratio = Math.min(
-          pageWidth / canvas.width,
-          pageHeight / canvas.height
-        );
-        const imgWidth = canvas.width * ratio;
-        const imgHeight = canvas.height * ratio;
+                    const img = document.createElement("img");
 
-        const x = (pageWidth - imgWidth) / 2;
-        const y = (pageHeight - imgHeight) / 2;
+                    let originalUrl = p.image || "";
+                    const proxied = `${IMAGE_PROXY_BASE}/image-proxy?url=${encodeURIComponent(
+                        originalUrl
+                    )}`;
 
-        pdf.addImage(imgData, "PNG", x, y, imgWidth, imgHeight);
+                    img.crossOrigin = "anonymous";
+                    img.referrerPolicy = "no-referrer";
 
-        document.body.removeChild(wrapper);
-      }
+                    img.onerror = function () {
+                        try {
+                            const fallback = resolveImageUrl(p.image);
+                            if (fallback && fallback !== proxied) {
+                                img.onerror = null;
+                                img.src = fallback;
+                                return;
+                            }
+                        } catch (e) { }
+                        img.src =
+                            "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
+                    };
 
-      pdf.save("sarjan-catalog.pdf");
-      showToast?.("PDF downloaded — check your Downloads folder.", "success");
-    } catch (err) {
-      console.error("PDF error:", err?.message || err);
-      showToast?.("PDF generation failed. See console for details.", "error");
-    } finally {
-      setIsGenerating(false);
-    }
-  };
+                    img.src = proxied;
+                    img.style.width = "100%";
+                    img.style.height = "100%";
+                    img.style.objectFit = "cover";
+                    imgWrap.appendChild(img);
 
-  return (
-    <>
-      {isGenerating && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="flex flex-col items-center gap-3 bg-white rounded-xl px-6 py-4 shadow-xl">
-            <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-            <p className="text-sm font-semibold text-gray-700">
-              Generating PDF… Please wait
-            </p>
-          </div>
-        </div>
-      )}
+                    // ⭐⭐⭐ ADD WATERMARK OVERLAY ⭐⭐⭐
+                    const wm = document.createElement("img");
+                    // set crossOrigin before src so html2canvas can use it without tainting
+                    wm.crossOrigin = "anonymous";
+                    wm.alt = "watermark";
+                    wm.style.position = "absolute";
+                    wm.style.bottom = "6px";
+                    wm.style.right = "6px";
+                    wm.style.opacity = "0.75";
+                    wm.style.width = "28%";
+                    wm.style.maxWidth = "120px";
+                    wm.style.pointerEvents = "none";
+                    wm.style.userSelect = "none";
+                    wm.style.mixBlendMode = "normal";  // try "multiply" if you want darker effect
+                    // append to image wrapper (so watermark loads as part of wrapper)
+                    imgWrap.appendChild(wm);
 
-      <div className="flex justify-end">
-        <button
-          onClick={handleDownload}
-          disabled={isGenerating}
-          className={`px-5 py-2 rounded-lg text-white text-sm font-semibold shadow-md transition duration-200 ${
-            isGenerating
-              ? "bg-blue-400 cursor-not-allowed"
-              : "bg-blue-600 hover:bg-blue-700"
-          }`}
-        >
-          {isGenerating ? "Generating..." : "Download Catalog PDF"}
-        </button>
-      </div>
-    </>
-  );
+                    // set src after crossOrigin is set
+                    wm.src = WATERMARK_URL;
+
+
+                    const info = document.createElement("div");
+                    info.style.display = "flex";
+                    info.style.flexDirection = "column";
+                    info.style.alignItems = "center";
+                    info.style.justifyContent = "center";
+                    info.style.width = "100%";
+                    info.style.marginTop = "6px";
+                    info.style.fontSize = "11px";
+                    info.style.color = "#0f3b6a";
+                    info.style.fontWeight = "700";
+                    info.style.lineHeight = "1.2";
+                    info.style.textAlign = "center";
+
+                    const line1 = document.createElement("span");
+                    line1.innerHTML = `Model No. <span style="font-weight:800;">${p.model}</span>`;
+
+                    const line2 = document.createElement("span");
+                    line2.style.marginTop = "2px";
+                    line2.innerHTML = `Rs.<span style="font-weight:800;">${p.price}</span>/-`;
+
+                    info.appendChild(line1);
+                    info.appendChild(line2);
+
+                    card.appendChild(imgWrap);
+                    card.appendChild(info);
+                    grid.appendChild(card);
+                });
+
+
+                wrapper.appendChild(grid);
+
+                const footer = document.createElement("div");
+                footer.style.marginTop = "18px";
+                footer.style.display = "flex";
+                footer.style.justifyContent = "space-between";
+                footer.style.alignItems = "center";
+                footer.style.background = "#003b7a";
+                footer.style.color = "white";
+                footer.style.padding = "6px 12px";
+                footer.style.fontSize = "12px";
+                footer.innerHTML = `<span>📞 +91 9898803407</span><span>🌍 www.sarjanindustries.com</span>`;
+                wrapper.appendChild(footer);
+
+                document.body.appendChild(wrapper);
+
+                await new Promise((r) => setTimeout(r, 150));
+
+                const imgs = Array.from(wrapper.querySelectorAll("img"));
+                await Promise.all(
+                    imgs.map(
+                        (image) =>
+                            new Promise((resolve) => {
+                                if (image.complete && image.naturalHeight !== 0) return resolve();
+                                image.onload = image.onerror = () => resolve();
+                                setTimeout(() => resolve(), 10000);
+                            })
+                    )
+                );
+
+                const canvas = await html2canvas(wrapper, {
+                    scale: 2,
+                    useCORS: true,
+                    allowTaint: false,
+                    imageTimeout: 20000,
+                });
+
+                const imgData = canvas.toDataURL("image/png");
+
+                const ratio = Math.min(
+                    pageWidth / canvas.width,
+                    pageHeight / canvas.height
+                );
+                const imgWidth = canvas.width * ratio;
+                const imgHeight = canvas.height * ratio;
+
+                const x = (pageWidth - imgWidth) / 2;
+                const y = (pageHeight - imgHeight) / 2;
+
+                pdf.addImage(imgData, "PNG", x, y, imgWidth, imgHeight);
+
+                document.body.removeChild(wrapper);
+            }
+
+            pdf.save("sarjan-catalog.pdf");
+            showToast?.("PDF downloaded — check your Downloads folder.", "success");
+        } catch (err) {
+            console.error("PDF error:", err?.message || err);
+            showToast?.("PDF generation failed. See console for details.", "error");
+        } finally {
+            setIsGenerating(false);
+        }
+    };
+
+    return (
+        <>
+            {isGenerating && (
+                <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+                    <div className="flex flex-col items-center gap-3 bg-white rounded-xl px-6 py-4 shadow-xl">
+                        <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                        <p className="text-sm font-semibold text-gray-700">Generating PDF…</p>
+                    </div>
+                </div>
+            )}
+
+            <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                    <label className="text-sm">Layout:</label>
+                    <select
+                        value={preset}
+                        onChange={(e) => {
+                            setPreset(e.target.value);
+                            if (e.target.value === "3x3") {
+                                setRows(3); setCols(3);
+                            } else if (e.target.value === "4x4") {
+                                setRows(4); setCols(4);
+                            }
+                        }}
+                        className="border rounded px-2 py-1 text-sm"
+                    >
+                        <option value="3x3">3 × 3 (9 / page)</option>
+                        <option value="4x4">4 × 4 (16 / page)</option>
+
+                    </select>
+
+                    {preset === "custom" && (
+                        <>
+                            <input
+                                type="number"
+                                min="1"
+                                value={rows}
+                                onChange={(e) => setRows(Number(e.target.value))}
+                                className="w-14 px-2 py-1 border rounded text-sm"
+                                placeholder="rows"
+                            />
+                            <span className="text-sm">×</span>
+                            <input
+                                type="number"
+                                min="1"
+                                value={cols}
+                                onChange={(e) => setCols(Number(e.target.value))}
+                                className="w-14 px-2 py-1 border rounded text-sm"
+                                placeholder="cols"
+                            />
+                        </>
+                    )}
+                </div>
+
+                <div className="flex-1" />
+
+                <button
+                    onClick={handleDownload}
+                    disabled={isGenerating}
+                    className={`px-5 py-2 rounded-lg text-white text-sm font-semibold shadow-md transition duration-200 ${isGenerating ? "bg-blue-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"}`}
+                >
+                    {isGenerating ? "Generating..." : `Download Catalog PDF (${computeItemsPerPage()} / page)`}
+                </button>
+            </div>
+        </>
+    );
 };
+
 
 
 const ProductCard = ({ product }) => {
@@ -588,22 +779,29 @@ const ProductCard = ({ product }) => {
                 </div>
             </div>
 
-            {/* Model + Price (Styled Like Your Image) */}
-            {/* Model + Price (Styled Like Your Image) */}
+            {/* Model */}
             <div className="w-full text-center mt-2">
                 <p className="text-[12px] font-bold text-[#0f3b6a] leading-tight">
-                     <span className="font-extrabold">{product.model}</span>
+                    <span className="font-extrabold">{product.model}</span>
                 </p>
 
+                {/* Price */}
                 <p className="text-[12px] font-bold text-[#0f3b6a] leading-tight mt-0.5">
-                    ₹.<span className="font-extrabold">{product.price}</span>/-
-                </p>
+                    ₹.<span className="font-extrabold">{product.price}</span>/-</p>
+
+                {/* 🔥 Category + Subcategory (NEW) */}
+                {(product.category || product.subcategory) && (
+                    <p className="text-[11px] text-gray-600 mt-1 font-medium">
+                        {product.category || ""}
+                        {product.category && product.subcategory ? " • " : ""}
+                        {product.subcategory || ""}
+                    </p>
+                )}
             </div>
-
-
         </div>
     );
 };
+
 
 const ProductGrid = () => {
     const { products } = useProducts();
@@ -617,119 +815,166 @@ const ProductGrid = () => {
 };
 
 const Home = () => {
+    const { loading, products, categories } = useProducts();
+    const [selectedCategory, setSelectedCategory] = useState("");
+    const [selectedSub, setSelectedSub] = useState("");
+
+    // filter products by selected category/subcategory
+    const filtered = products.filter((p) => {
+        if (selectedCategory && p.category !== selectedCategory) return false;
+        if (selectedSub && p.subcategory !== selectedSub) return false;
+        return true;
+    });
+
     return (
         <main className="min-h-screen bg-gray-100 flex justify-center py-5 sm:py-10 px-0 sm:px-4">
             <div className="flex flex-col items-center w-full max-w-2xl">
                 <div className="mb-4 sm:mb-8 w-full max-w-[595px] px-4 sm:px-0">
-                    <DownloadPdf />
+                    <DownloadPdf productsToExport={filtered} />
                 </div>
 
-                <div
-                    id="catalog-page-main"
-                    className="
-            w-full 
-            min-h-[700px]
-            max-w-[595px] 
-            bg-white 
-            rounded-md 
-            shadow-2xl
-            relative
-            px-4
-            sm:px-8
-            py-8
-            overflow-hidden
-          "
-                    style={{
-                        backgroundImage:
-                            "repeating-linear-gradient(45deg, #ededed 0, #ededed 1px, transparent 1px, transparent 30px), repeating-linear-gradient(-45deg, #ededed 0, #ededed 1px, transparent 1px, transparent 30px)",
-                        backgroundSize: "30px 30px",
-                    }}
-                >
-                    <div className="mb-6 pl-1 text-center">
-                        <h1 className="text-[30px] sm:text-[34px] font-bold tracking-wider text-[#003b7a] leading-[1] inline-block">
-                            Sarjan<span className="text-xs sm:text-sm align-super">®</span>
-                        </h1>
-                        <p className="text-[10px] sm:text-[11px] tracking-[2px] text-gray-700 uppercase">
-                            The Creation Of Creativity
-                        </p>
+                {/* Filters + Loading */}
+                <div className="w-full max-w-[595px] mb-4 px-4 sm:px-0">
+                    <div className="flex gap-2 items-center mb-3">
+                        <select
+                            value={selectedCategory}
+                            onChange={(e) => {
+                                setSelectedCategory(e.target.value);
+                                setSelectedSub("");
+                            }}
+                            className="border rounded px-3 py-2 text-sm"
+                        >
+                            <option value="">All Categories</option>
+                            {categories.map((c) => (
+                                <option key={c.id} value={c.name}>
+                                    {c.name}
+                                </option>
+                            ))}
+                        </select>
+
+                        <select
+                            value={selectedSub}
+                            onChange={(e) => setSelectedSub(e.target.value)}
+                            className="border rounded px-3 py-2 text-sm"
+                            disabled={!selectedCategory}
+                        >
+                            <option value="">All Subcategories</option>
+                            {(categories.find((c) => c.name === selectedCategory)?.sub || []).map(
+                                (s) => (
+                                    <option key={s.id} value={s.name}>
+                                        {s.name}
+                                    </option>
+                                )
+                            )}
+                        </select>
                     </div>
 
-                    <ProductGrid />
+                    {loading ? (
+                        <div className="w-full flex items-center justify-center py-8">
+                            <div className="flex flex-col items-center">
+                                <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-3"></div>
+                                <p className="text-sm font-medium text-gray-700">Loading products — please wait</p>
+                            </div>
+                        </div>
+                    ) : (
+                        <div id="catalog-page-main" className="w-full min-h-[700px] max-w-[595px] bg-white rounded-md shadow-2xl relative px-4 sm:px-8 py-8 overflow-hidden" style={{
+                            backgroundImage:
+                                "repeating-linear-gradient(45deg, #ededed 0, #ededed 1px, transparent 1px, transparent 30px), repeating-linear-gradient(-45deg, #ededed 0, #ededed 1px, transparent 1px, transparent 30px)",
+                            backgroundSize: "30px 30px",
+                        }}>
+                            <div className="mb-6 pl-1 text-center">
+                                <h1 className="text-[30px] sm:text-[34px] font-bold tracking-wider text-[#003b7a] leading-[1] inline-block">
+                                    Sarjan<span className="text-xs sm:text-sm align-super">®</span>
+                                </h1>
+                                <p className="text-[10px] sm:text-[11px] tracking-[2px] text-gray-700 uppercase">The Creation Of Creativity</p>
+                            </div>
 
-                    <div className="absolute bottom-0 left-0 right-0 bg-[#003b7a] text-white flex justify-between items-center px-6 sm:px-10 py-1 text-[11px] sm:text-[13px] w-full">
-                        <span>📞 +91 9898803407</span>
-                        <span>🌍 www.sarjanindustries.com</span>
-                    </div>
+                            {/* product grid shows filtered */}
+                            <div className="grid grid-cols-3 gap-x-2 gap-y-6 sm:gap-x-8 sm:gap-y-10 w-full">
+                                {filtered.length === 0 ? (
+                                    <p className="text-center text-gray-500 col-span-3">No products to show.</p>
+                                ) : (
+                                    filtered.map((p) => <ProductCard key={p.id} product={p} />)
+                                )}
+                            </div>
+
+                            <div className="absolute bottom-0 left-0 right-0 bg-[#003b7a] text-white flex justify-between items-center px-6 sm:px-10 py-1 text-[11px] sm:text-[13px] w-full">
+                                <span>📞 +91 9898803407</span>
+                                <span>🌍 www.sarjanindustries.com</span>
+                            </div>
+                        </div>
+                    )}
                 </div>
             </div>
         </main>
     );
 };
 
+
 const Login = () => {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const { setView } = useProducts();
-  const [error, setError] = useState("");
+    const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
+    const { setView } = useProducts();
+    const [error, setError] = useState("");
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    setError("");
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        setError("");
 
-    if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
-      localStorage.setItem("isAdmin", "true");
-      setView("admin");
-    } else {
-      setError("Invalid email or password");
-    }
-  };
+        if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
+            localStorage.setItem("isAdmin", "true");
+            setView("admin");
+        } else {
+            setError("Invalid email or password");
+        }
+    };
 
-  return (
-    <main className="flex items-center justify-center min-h-[calc(100vh-56px)] bg-gray-100 p-4">
-      <div className="bg-white shadow-xl rounded-xl p-8 max-w-sm w-full">
-        <h4 className="text-2xl font-bold mb-6 text-center text-gray-800">
-          Admin Login
-        </h4>
+    return (
+        <main className="flex items-center justify-center min-h-[calc(100vh-56px)] bg-gray-100 p-4">
+            <div className="bg-white shadow-xl rounded-xl p-8 max-w-sm w-full">
+                <h4 className="text-2xl font-bold mb-6 text-center text-gray-800">
+                    Admin Login
+                </h4>
 
-        <form onSubmit={handleSubmit}>
-          <div className="mb-4">
-            <label className="block text-sm font-medium mb-1 text-gray-700">
-              Email
-            </label>
-            <input
-              type="email"
-              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-blue-500 focus:border-blue-500"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Enter Admin email"
-            />
-          </div>
+                <form onSubmit={handleSubmit}>
+                    <div className="mb-4">
+                        <label className="block text-sm font-medium mb-1 text-gray-700">
+                            Email
+                        </label>
+                        <input
+                            type="email"
+                            className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-blue-500 focus:border-blue-500"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            placeholder="Enter Admin email"
+                        />
+                    </div>
 
-          <div className="mb-4">
-            <label className="block text-sm font-medium mb-1 text-gray-700">
-              Password
-            </label>
-            <input
-              type="password"
-              className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-blue-500 focus:border-blue-500"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter Admin password"
-            />
-          </div>
+                    <div className="mb-4">
+                        <label className="block text-sm font-medium mb-1 text-gray-700">
+                            Password
+                        </label>
+                        <input
+                            type="password"
+                            className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-blue-500 focus:border-blue-500"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            placeholder="Enter Admin password"
+                        />
+                    </div>
 
-          {error && <p className="text-red-500 text-xs mb-3">{error}</p>}
+                    {error && <p className="text-red-500 text-xs mb-3">{error}</p>}
 
-          <button
-            type="submit"
-            className="w-full bg-blue-600 text-white font-semibold py-2 rounded-lg hover:bg-blue-700 transition"
-          >
-            Login
-          </button>
-        </form>
-      </div>
-    </main>
-  );
+                    <button
+                        type="submit"
+                        className="w-full bg-blue-600 text-white font-semibold py-2 rounded-lg hover:bg-blue-700 transition"
+                    >
+                        Login
+                    </button>
+                </form>
+            </div>
+        </main>
+    );
 };
 
 
@@ -834,6 +1079,9 @@ const NotFound = () => {
         </main>
     );
 };
+
+// ... rest of file unchanged (ProductModal, CategoriesManager, ManageCategoriesPage, AddProduct, ProductList, AdminDashboard, AppContent, export)
+
 
 const ProductModal = ({ isOpen, onClose, editingProduct }) => {
     const { addProduct, updateProduct, showToast } = useProducts();
@@ -974,23 +1222,339 @@ const ProductModal = ({ isOpen, onClose, editingProduct }) => {
         </div>
     );
 };
+const CategoriesManager = () => {
+    const { categories, addCategory, deleteCategory, addSubcategory, deleteSubcategory } = useProducts();
+    const [catName, setCatName] = useState("");
+    const [subName, setSubName] = useState("");
+    const [selectedCat, setSelectedCat] = useState("");
+
+    return (
+        <div className="bg-white rounded-xl shadow-lg p-6 mb-6 border border-gray-200">
+            <h2 className="text-2xl font-bold mb-4">Categories Manager</h2>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+                <input
+                    placeholder="New category name"
+                    value={catName}
+                    onChange={(e) => setCatName(e.target.value)}
+                    className="border rounded px-3 py-2"
+                />
+                <button onClick={() => { if (catName.trim()) { addCategory(catName.trim()); setCatName(""); } }} className="bg-indigo-600 text-white px-4 rounded">Add Category</button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-center mb-4">
+                <select className="border rounded px-3 py-2" value={selectedCat} onChange={(e) => setSelectedCat(e.target.value)}>
+                    <option value="">Select category</option>
+                    {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+                <input placeholder="New subcategory name" value={subName} onChange={(e) => setSubName(e.target.value)} className="border rounded px-3 py-2" />
+                <button onClick={() => { if (selectedCat && subName.trim()) { addSubcategory(selectedCat, subName.trim()); setSubName(""); } }} className="bg-green-600 text-white px-4 rounded">Add Subcategory</button>
+            </div>
+
+            <div>
+                {categories.length === 0 ? <p className="text-gray-500">No categories yet.</p> : (
+                    <div className="space-y-3">
+                        {categories.map(c => (
+                            <div key={c.id} className="p-3 border rounded">
+                                <div className="flex justify-between items-center">
+                                    <div className="font-semibold">{c.name}</div>
+                                    <div className="flex items-center gap-2">
+                                        <button onClick={() => deleteCategory(c.id)} className="text-red-600">Delete</button>
+                                    </div>
+                                </div>
+                                <div className="mt-2 text-sm">
+                                    <div className="font-medium">Subcategories:</div>
+                                    <div className="flex gap-2 mt-1 flex-wrap">
+                                        {c.sub.length === 0 ? <span className="text-gray-500">— none</span> : c.sub.map(s => (
+                                            <span key={s.id} className="px-2 py-1 bg-gray-100 rounded flex items-center gap-2">
+                                                {s.name}
+                                                <button onClick={() => deleteSubcategory(c.id, s.id)} className="text-xs text-red-500 ml-2">x</button>
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
+// ------------------ ManageCategoriesPage ------------------
+const ManageCategoriesPage = () => {
+    const { categories, addCategory, deleteCategory, addSubcategory, deleteSubcategory, products, addProduct, showToast, setFilters, setView } = useProducts();
+
+
+    const [newCategory, setNewCategory] = useState("");
+    const [selectedCatId, setSelectedCatId] = useState("");
+    const [newSub, setNewSub] = useState("");
+
+    // local small product form for adding product directly into selected category
+    const [pForm, setPForm] = useState({
+        model: "",
+        price: "",
+        image: "",
+        stock: 0,
+        category: "",
+        subcategory: "",
+    });
+    const [uploading, setUploading] = useState(false);
+
+    useEffect(() => {
+        // whenever selected category changes, set pForm.category to its name (or empty)
+        const cat = categories.find((c) => c.id === selectedCatId);
+        setPForm((prev) => ({ ...prev, category: cat ? cat.name : "", subcategory: "" }));
+    }, [selectedCatId, categories]);
+
+    const handleAddCategory = () => {
+        const name = newCategory.trim();
+        if (!name) return showToast("Category name required.", "error");
+        addCategory(name);
+        setNewCategory("");
+    };
+
+    const handleAddSub = () => {
+        if (!selectedCatId) return showToast("Select a category first.", "error");
+        const name = newSub.trim();
+        if (!name) return showToast("Subcategory name required.", "error");
+        addSubcategory(selectedCatId, name);
+        setNewSub("");
+    };
+
+    const handlePChange = (e) => {
+        const { name, value } = e.target;
+        setPForm((prev) => ({ ...prev, [name]: value }));
+    };
+
+    const handleImageUpload = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const fd = new FormData();
+        fd.append("image", file);
+
+        try {
+            setUploading(true);
+            const res = await fetch(`${API_BASE}/upload-image`, {
+                method: "POST",
+                body: fd,
+            });
+            const data = await res.json();
+            if (data.imageUrl) {
+                setPForm((prev) => ({ ...prev, image: data.imageUrl }));
+                showToast("Image uploaded!", "success");
+            } else if (data.relative) {
+                setPForm((prev) => ({ ...prev, image: data.relative }));
+                showToast("Image uploaded (relative).", "success");
+            } else {
+                showToast("Upload failed.", "error");
+            }
+        } catch (err) {
+            console.error(err);
+            showToast("Upload failed.", "error");
+        } finally {
+            setUploading(false);
+        }
+    };
+
+    const handleAddProductToCategory = (e) => {
+        e.preventDefault();
+        if (!pForm.model || !pForm.price || !pForm.image) {
+            return showToast("Fill model, price and image.", "error");
+        }
+        // ensure category set
+        const catName = pForm.category || (categories.find(c => c.id === selectedCatId)?.name) || "";
+        addProduct({
+            model: pForm.model,
+            price: Number(pForm.price),
+            image: pForm.image,
+            stock: Number(pForm.stock) || 0,
+            category: catName,
+            subcategory: pForm.subcategory || "",
+        });
+
+        // reset form but keep category selected for convenience
+        setPForm({
+            model: "",
+            price: "",
+            image: "",
+            stock: 0,
+            category: catName,
+            subcategory: "",
+        });
+
+        showToast("Product added to category.", "success");
+    };
+
+    // products that belong to selected category
+    const productsInCat = selectedCatId
+        ? products.filter((p) => p.category === (categories.find(c => c.id === selectedCatId)?.name))
+        : [];
+
+    return (
+        <main className="min-h-[calc(100vh-56px)] p-6 bg-gray-50">
+            <div className="max-w-5xl mx-auto">
+                <div className="flex items-center justify-between mb-6">
+                    <h2 className="text-2xl font-bold">Manage Categories</h2>
+                    <p className="text-sm text-gray-500">Create categories & add products directly into them.</p>
+                </div>
+
+                {/* Create Category */}
+                <div className="bg-white p-4 rounded-lg shadow mb-6">
+                    <div className="flex gap-2">
+                        <input
+                            value={newCategory}
+                            onChange={(e) => setNewCategory(e.target.value)}
+                            placeholder="New category name"
+                            className="px-3 py-2 border rounded w-full"
+                        />
+                        <button onClick={handleAddCategory} className="px-4 bg-indigo-600 text-white rounded">Add Category</button>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {/* Left: categories list */}
+                    <div className="bg-white p-4 rounded-lg shadow">
+                        <h3 className="font-semibold mb-3">Categories</h3>
+                        {categories.length === 0 ? (
+                            <p className="text-gray-500 text-sm">No categories yet.</p>
+                        ) : (
+                            <div className="space-y-2">
+                                {categories.map((c) => (
+                                    <div key={c.id} className={`p-2 rounded flex justify-between items-center ${selectedCatId === c.id ? "bg-blue-50 border border-blue-100" : ""}`}>
+                                        <div>
+                                            <div className="font-medium">{c.name}</div>
+                                            <div className="text-xs text-gray-500 mt-1">
+                                                {c.sub.length ? c.sub.map(s => s.name).join(", ") : "— no subcategories"}
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                onClick={() => {
+                                                    // सिर्फ़ category select करो — page मत बदलना
+                                                    setSelectedCatId(c.id);
+                                                }}
+                                                className="text-sm text-blue-600 px-2 py-1 rounded hover:bg-blue-50"
+                                            >
+                                                Open
+                                            </button>
+
+
+
+                                            <button onClick={() => deleteCategory(c.id)} className="text-sm text-red-600 px-2 py-1 rounded hover:bg-red-50">Delete</button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Middle: category details (sub add + product add form) */}
+                    <div className="bg-white p-4 rounded-lg shadow">
+                        <h3 className="font-semibold mb-3">Selected Category</h3>
+                        {selectedCatId ? (
+                            <>
+                                <div className="mb-3">
+                                    <div className="text-lg font-medium">{categories.find(c => c.id === selectedCatId)?.name}</div>
+                                </div>
+
+                                {/* Add subcategory */}
+                                <div className="mb-4">
+                                    <div className="flex gap-2">
+                                        <input value={newSub} onChange={(e) => setNewSub(e.target.value)} placeholder="New subcategory name" className="px-3 py-2 border rounded w-full" />
+                                        <button onClick={handleAddSub} className="px-3 bg-green-600 text-white rounded">Add Sub</button>
+                                    </div>
+                                </div>
+
+                                {/* Quick add product into this category */}
+                                <div>
+                                    <h4 className="font-medium mb-2">Add product to this category</h4>
+                                    <form onSubmit={handleAddProductToCategory} className="space-y-3">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                            <input name="model" value={pForm.model} onChange={handlePChange} placeholder="Model name" className="px-3 py-2 border rounded" />
+                                            <input name="price" type="number" value={pForm.price} onChange={handlePChange} placeholder="Price" className="px-3 py-2 border rounded" />
+                                            <input name="stock" type="number" value={pForm.stock} onChange={handlePChange} placeholder="Stock" className="px-3 py-2 border rounded" />
+                                            <select name="subcategory" value={pForm.subcategory} onChange={handlePChange} className="px-3 py-2 border rounded">
+                                                <option value="">Select subcategory (optional)</option>
+                                                {(categories.find(c => c.id === selectedCatId)?.sub || []).map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+                                            </select>
+                                        </div>
+
+                                        <div>
+                                            <div className="flex items-center gap-3">
+                                                <label className="cursor-pointer text-sm text-indigo-600 border border-dashed px-3 py-1 rounded">
+                                                    {uploading ? "Uploading..." : "Upload Image"}
+                                                    <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+                                                </label>
+                                                <input name="image" value={pForm.image} onChange={handlePChange} placeholder="Or paste image URL" className="px-3 py-2 border rounded w-full" />
+                                            </div>
+                                        </div>
+
+                                        <div className="flex justify-end">
+                                            <button type="submit" className="px-4 py-2 bg-indigo-600 text-white rounded">Add Product</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </>
+                        ) : (
+                            <p className="text-gray-500">Select a category from the left to manage it.</p>
+                        )}
+                    </div>
+
+                    {/* Right: products in selected category */}
+                    <div className="bg-white p-4 rounded-lg shadow">
+                        <h3 className="font-semibold mb-3">Products in category</h3>
+                        {selectedCatId ? (
+                            productsInCat.length === 0 ? (
+                                <p className="text-gray-500 text-sm">No products in this category yet.</p>
+                            ) : (
+                                <div className="space-y-3">
+                                    {productsInCat.map((p) => (
+                                        <div key={p.id} className="p-2 border rounded flex items-center gap-3">
+                                            <img src={resolveImageUrl(p.image)} alt={p.model} className="w-12 h-12 object-cover rounded" />
+                                            <div className="flex-1">
+                                                <div className="font-medium">{p.model}</div>
+                                                <div className="text-xs text-gray-500">₹{p.price} • Stock: {p.stock}</div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )
+                        ) : (
+                            <p className="text-gray-500">Select a category to view its products.</p>
+                        )}
+                    </div>
+                </div>
+            </div>
+        </main>
+    );
+};
+// ------------------ end ManageCategoriesPage ------------------
+
 
 const AddProduct = () => {
-    const { addProduct, showToast } = useProducts();
+    const { addProduct, showToast, categories } = useProducts();
     const [form, setForm] = useState({
         model: "",
         price: "",
         image: "",
         stock: 0,
+        category: "",
+        subcategory: "",
     });
 
     const [uploading, setUploading] = useState(false);
 
     const handleChange = (e) => {
-        setForm((prev) => ({
-            ...prev,
-            [e.target.name]: e.target.value,
-        }));
+        const { name, value } = e.target;
+        // when category changes, reset subcategory
+        if (name === "category") {
+            setForm((prev) => ({ ...prev, category: value, subcategory: "" }));
+        } else {
+            setForm((prev) => ({ ...prev, [name]: value }));
+        }
     };
 
     const handleImageUpload = async (e) => {
@@ -1045,6 +1609,8 @@ const AddProduct = () => {
             price: Number(form.price),
             image: form.image,
             stock: Number(form.stock) || 0,
+            category: form.category || "",
+            subcategory: form.subcategory || "",
         });
 
         setForm({
@@ -1052,8 +1618,16 @@ const AddProduct = () => {
             price: "",
             image: "",
             stock: 0,
+            category: "",
+            subcategory: "",
         });
     };
+
+    // helper to get subcategories for selected category name
+    const availableSubcats =
+        (categories.find((c) => c.name === form.category)?.sub || []).map(
+            (s) => s.name
+        ) || [];
 
     return (
         <div className="bg-white rounded-xl shadow-lg p-6 mb-8 border border-gray-200">
@@ -1113,7 +1687,28 @@ const AddProduct = () => {
                     />
                 </div>
 
-                {/* Image URL + Upload */}
+                {/* Category */}
+                <div className="flex flex-col">
+                    <label htmlFor="category" className="text-sm font-medium mb-1">
+                        Category
+                    </label>
+                    <select
+                        id="category"
+                        name="category"
+                        value={form.category}
+                        onChange={handleChange}
+                        className="border border-gray-300 rounded-lg px-4 py-2 text-base focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 transition"
+                    >
+                        <option value="">Select category (optional)</option>
+                        {categories.map((c) => (
+                            <option key={c.id} value={c.name}>
+                                {c.name}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+
+                {/* Image URL + Upload (span 3 cols) */}
                 <div className="flex flex-col md:col-span-3">
                     <label htmlFor="image" className="text-sm font-medium mb-1">
                         Image URL
@@ -1151,7 +1746,33 @@ const AddProduct = () => {
                                 style={{ width: "100px", height: "auto", marginTop: "10px" }}
                             />
                         )}
+                    </div>
 
+                    {/* Subcategory select (shows when category selected) */}
+                    <div className="mt-3">
+                        <label htmlFor="subcategory" className="text-sm font-medium mb-1 block">
+                            Subcategory
+                        </label>
+                        <select
+                            id="subcategory"
+                            name="subcategory"
+                            value={form.subcategory}
+                            onChange={handleChange}
+                            disabled={!form.category || availableSubcats.length === 0}
+                            className="border border-gray-300 rounded-lg px-4 py-2 text-base focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 transition w-full"
+                        >
+                            <option value="">
+                                {form.category ? "Select subcategory (optional)" : "Select category first"}
+                            </option>
+                            {availableSubcats.map((s) => (
+                                <option key={s} value={s}>
+                                    {s}
+                                </option>
+                            ))}
+                        </select>
+                        <p className="text-xs text-gray-500 mt-1">
+                            Choose subcategory if available (optional).
+                        </p>
                     </div>
                 </div>
 
@@ -1301,7 +1922,17 @@ const AdminDashboard = () => {
                             Manage all products in your catalog.
                         </p>
                     </div>
-                    <DownloadPdf />
+
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={() => setView("manage-categories")}
+                            className="px-4 py-2 bg-yellow-500 text-white rounded-lg font-semibold shadow hover:bg-yellow-600 transition"
+                        >
+                            Manage Categories
+                        </button>
+
+                        <DownloadPdf />
+                    </div>
                 </header>
 
                 <AddProduct />
@@ -1325,10 +1956,13 @@ function AppContent() {
                 return <Register />;
             case "home":
                 return <Home />;
+            case "manage-categories":
+                return <ManageCategoriesPage />;
             default:
                 return <NotFound />;
         }
     };
+
 
     return (
         <>
