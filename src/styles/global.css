@@ -1,0 +1,17 @@
+/* global.css */
+.brand-logo {
+  display: block;
+  margin: 0;
+  padding: 0;
+  width: 220px;         /* desired fixed width */
+  max-width: 60%;       /* responsive cap */
+  height: auto;         /* preserve aspect ratio */
+  object-fit: contain;
+  image-rendering: auto; /* don't force pixelated scaling */
+}
+
+/* यदि कोई other rule override कर रहा हो तो last-resort use !important */
+.brand-logo.force {
+  width: 220px !important;
+  max-width: 60% !important;
+}

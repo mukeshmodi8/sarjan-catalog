@@ -6,7 +6,6 @@ import ProductCard from "./ProductCard.jsx";
 const ProductGrid = () => {
   const { products } = useProducts();
 
-  // ✅ सिर्फ़ पहले 6 products front page पर
   const visibleProducts = products.slice(0, 6);
 
   return (

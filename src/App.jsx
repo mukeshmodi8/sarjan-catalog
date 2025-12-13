@@ -1,37 +1,33 @@
 // src/App.jsx
 import React from "react";
-import { Routes, Route } from "react-router-dom";
+import { ProductProvider, useProducts } from "./context/ProductProvider";
+import Navbar from "./components/Navbar";
+import Toast from "./components/Toast";
+import Home from "./pages/Home";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
+import NotFound from "./pages/NotFound";
+import AdminDashboard from "./components/AdminDashboard";
+import ManageCategoriesPage from "./components/ManageCategoriesPage";
 
-// import Navbar from "./components/Navbar.jsx";
-import Home from "./pages/Home.jsx";
-import Admin from "./pages/Admin.jsx";
-import Login from "./pages/Login.jsx";
-import NotFound from "./pages/NotFound.jsx";
-import PrivateRoute from "./routes/PrivateRoute.jsx";
+function AppContent() {
+  const { view } = useProducts();
+  switch (view) {
+    case "admin": return <AdminDashboard />;
+    case "login": return <Login />;
+    case "register": return <Register />;
+    case "home": return <Home />;
+    case "manage-categories": return <ManageCategoriesPage />;
+    default: return <NotFound />;
+  }
+}
 
-const App = () => {
+export default function App() {
   return (
-    <div className="app-wrapper">
-      {/* <Navbar /> */}
-
-      <Routes>
-        <Route path="/" element={<Home />} />
-
-        <Route
-          path="/admin"
-          element={
-            <PrivateRoute>
-              <Admin />
-            </PrivateRoute>
-          }
-        />
-
-        <Route path="/login" element={<Login />} />
-
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-    </div>
+    <ProductProvider>
+      <Navbar />
+      <AppContent />
+      <Toast />
+    </ProductProvider>
   );
-};
-
-export default App;
+}

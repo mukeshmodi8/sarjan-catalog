@@ -1,8 +1,10 @@
-// server.js
+// server.js (improved)
+import dotenv from "dotenv";
+dotenv.config(); // load env first
+
 import express from "express";
 import cors from "cors";
 import mongoose from "mongoose";
-import dotenv from "dotenv";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
@@ -16,16 +18,15 @@ import imageProxyRoutes from "./routes/imageProxy.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// ----- ENV -----
-dotenv.config(); // Render + local दोनों पर काम करेगा
-
+// ----- CONFIG -----
 const MONGO_URI = process.env.MONGO_URI;
-const PORT = process.env.PORT || 5000;
+const PORT = Number(process.env.PORT || 5000);
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "http://localhost:5173,http://localhost:5174").split(",");
 
+// basic validation
 if (!MONGO_URI) {
-  console.error("❌ MONGO_URI not found in environment variables!");
-  // Render पर error दिख जाए इसलिए:
-  // process.exit(1);  // चाहो तो enable कर सकते हो
+  console.error("❌ MONGO_URI not found in environment variables! Exiting.");
+  process.exit(1);
 }
 
 // ----- APP INIT -----
@@ -43,21 +44,20 @@ app.use(express.json());
 
 app.use(
   cors({
-    origin: [
-      "http://localhost:5173",
-      "http://localhost:5174",               // ← यहाँ add करिए
-      "https://sarjan-catalog-1.onrender.com"
-    ],
+    origin: (origin, cb) => {
+      // allow requests with no origin (mobile apps, curl, same-origin)
+      if (!origin) return cb(null, true);
+      if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
+      cb(new Error("CORS policy: origin not allowed"));
+    },
     credentials: true,
   })
 );
 
-
-
 // ----- STATIC -----
-app.use("/uploads", express.static(uploadPath));
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-// ----- HEALTH CHECK ROUTE (test के लिए) -----
+// ----- HEALTH CHECK -----
 app.get("/", (req, res) => {
   res.json({ ok: true, message: "Sarjan Catalog API is live 🚀" });
 });
@@ -73,12 +73,31 @@ mongoose
   .connect(MONGO_URI)
   .then(() => {
     console.log("✅ MongoDB Connected");
-    app.listen(PORT, () => {
+    const server = app.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
     });
+
+    // handle server errors (e.g. EADDRINUSE)
+    server.on("error", (err) => {
+      console.error("Server error:", err);
+      process.exit(1);
+    });
+
+    // graceful shutdown
+    const shutdown = async () => {
+      console.log("Shutting down...");
+      await mongoose.disconnect();
+      server.close(() => process.exit(0));
+    };
+    process.on("SIGINT", shutdown);
+    process.on("SIGTERM", shutdown);
   })
   .catch((err) => {
     console.error("❌ MongoDB Error:", err.message);
-    // Render पर service crash करवानी हो तो:
-    // process.exit(1);
+    process.exit(1);
   });
+
+// catch unhandled rejections
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled Rejection:", reason);
+});

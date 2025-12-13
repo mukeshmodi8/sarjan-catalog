@@ -1,31 +1,23 @@
+// src/components/ProductCard.jsx
 import React from "react";
 
-const ProductCard = ({ product }) => {
+export default function ProductCard({ product }) {
   return (
-    <div className="w-[150px]">
-
-      <div className="rounded-[22px] overflow-hidden border-[4px] border-[#1c3f7a] bg-white">
-     
-        <img
-          src={product.image}
-          alt={product.model}
-          className="w-full h-[150px] object-cover"   // ✅ 170 → 150
-        />
-
+    <div className="w-full flex flex-col items-center">
+      <div className="rounded-[22px] overflow-hidden border-[4px] border-[#1c3f7a] bg-white w-full shadow-md">
+        <div className="w-full aspect-[3/4]">
+          <img src={product.image ? product.image : "/watermark.png"} alt={product.model || "product"} className="w-full h-full object-cover select-none" draggable={false} />
+        </div>
       </div>
 
-      <div className="flex justify-between mt-1 text-[11px] text-black">
-        <span>
-          Model No. <span className="font-semibold">{product.model}</span>
-        </span>
-        <span>
-          Rs.<span className="font-semibold">{product.price}/-</span>
-        </span>
+      <div className="w-full text-center mt-2">
+        <p className="text-[12px] font-bold text-[#0f3b6a] leading-tight"><span className="font-extrabold">{product.model}</span></p>
+        <p className="text-[12px] font-bold text-[#0f3b6a] leading-tight mt-0.5">₹.<span className="font-extrabold">{product.price}</span>/-</p>
+
+        {(product.category || product.subcategory) && (
+          <p className="text-[11px] text-gray-600 mt-1 font-medium">{product.category}{product.category && product.subcategory ? " • " : ""}{product.subcategory}</p>
+        )}
       </div>
-
-
     </div>
   );
-};
-
-export default ProductCard;
+}
