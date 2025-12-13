@@ -12,7 +12,7 @@ export default function Home() {
   const [selectedSub, setSelectedSub] = useState("");
 
   // LIFTED layout state (DownloadPdf receives it)
-  const [layout, setLayout] = useState("3x3"); // '3x3' | '4x4' | 'custom'
+  const [layout, setLayout] = useState("3x3");
 
   useEffect(() => {
     setSelectedCategory(filters.category || "");
@@ -25,16 +25,17 @@ export default function Home() {
     return true;
   });
 
+
   /***** TUNEABLE CONSTANTS (change these to tweak spacing/logo size) *****/
   // LOGO_HEIGHT: maximum rendered logo height (px) you'd like to allow
   // LOGO_BUFFER: expected space below logo before cards start (px)
   // EXTRA_OVERLAP: how much negative margin to apply (pull cards upward) (px)
-  const LOGO_HEIGHT = 1100;  
-  const LOGO_BUFFER = 930;    
-  const EXTRA_OVERLAP = 5;  
+  const LOGO_HEIGHT = 1030;
+  const LOGO_BUFFER = 930;
+  const EXTRA_OVERLAP = 5;
   // derived
   const gridPaddingTop = Math.max(LOGO_HEIGHT - LOGO_BUFFER, 12); // minimum 12px
-  const negativeMargin = EXTRA_OVERLAP; 
+  const negativeMargin = EXTRA_OVERLAP;
   // dynamic grid classes
   const gridColsClass = layout === "4x4" ? "grid-cols-4" : "grid-cols-3";
   const cardMaxW = layout === "4x4" ? "max-w-[140px]" : "max-w-[160px]";
@@ -43,7 +44,6 @@ export default function Home() {
     <main className="min-h-screen bg-gray-100 flex justify-center py-5 sm:py-10 px-4">
       <div className="flex flex-col items-center w-full max-w-2xl">
         <div className="mb-4 sm:mb-8 w-full max-w-[595px] px-4 sm:px-0">
-          {/* DownloadPdf को layout और setter पास कर रहे हैं ताकि page select और PDF दोनों sync रहें */}
           <DownloadPdf
             productsToExport={filtered}
             selectedCategory={selectedCategory}
@@ -84,9 +84,8 @@ export default function Home() {
                   setFilters((prev) => ({ ...prev, subcategory: value }));
                 }}
                 disabled={!selectedCategory}
-                className={`w-full min-w-[150px] border rounded-lg px-3 py-2 text-sm shadow-sm transition ${
-                  selectedCategory ? "bg-white border-gray-300" : "bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed"
-                }`}
+                className={`w-full min-w-[150px] border rounded-lg px-3 py-2 text-sm shadow-sm transition ${selectedCategory ? "bg-white border-gray-300" : "bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed"
+                  }`}
               >
                 <option value="">All Subcategories</option>
                 {(categories.find((c) => c.name === selectedCategory)?.sub || []).map((s) => (
@@ -160,16 +159,10 @@ export default function Home() {
               <div className="absolute bottom-0 left-0 right-0 bg-[#003b7a] text-white px-6 sm:px-10 py-4 w-full">
                 <div className="flex flex-col items-center text-center gap-1">
                   <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-1 text-[10px] sm:text-[11px]">
-                    <div className="flex items-center gap-1">
-                      <span>🌐</span>
-                      <span>www.sarjanindustries.com</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <span>📞</span>
-                      <span>+91 9898803407</span>
+                    <div className="absolute bottom-0 left-0 right-0 bg-[#003b7a] text-white px-4 py-3 w-full text-[9px] sm:text-[11px] text-center">
+                      🌐 www.sarjanindustries.com &nbsp;|&nbsp; 📞 +91 9898803407 &nbsp;|&nbsp; S.no. 1241/1, Aghar, Ta. Saraswati Patan, Deesa State Highway, Gujarat 384285
                     </div>
                   </div>
-                  <div className="text-[9px] sm:text-[10px] opacity-90 leading-snug">S.no. 1241/1, Village : Aghar, Ta. : Saraswati Patan Deesa State Highway Dist. : Gujarat 384285</div>
                 </div>
               </div>
             </div>

@@ -6,14 +6,12 @@ import { useProducts } from "../context/ProductProvider";
 export default function CatalogView() {
   const { products } = useProducts();
 
-  // CHANGE THESE to control size & spacing
-  const LOGO_HEIGHT = 260;   // जितना logo height रखा था
-  const LOGO_BUFFER = 60;    // पहले जैसा रखा है
-  const EXTRA_OVERLAP = 18;  // <-- यहाँ कम/ज्यादा करो (10 .. 30) ; positive number
+  const LOGO_HEIGHT = 260;
+  const LOGO_BUFFER = 60; 
+  const EXTRA_OVERLAP = 18;  
   const negativeMargin = EXTRA_OVERLAP;
 
-  // paddingTop for grid: make cards start below the logo but closer by subtracting BUFFER
-  const gridPaddingTop = Math.max(LOGO_HEIGHT - LOGO_BUFFER, 12); // at least 12px
+  const gridPaddingTop = Math.max(LOGO_HEIGHT - LOGO_BUFFER, 12);
 
   return (
     <div id="catalog-page" className="sr-only">
@@ -49,7 +47,7 @@ export default function CatalogView() {
           className="grid grid-cols-3 gap-x-4 gap-y-6 place-items-center w-full"
           style={{
             paddingTop: `${gridPaddingTop}px`,
-            marginTop: `-${negativeMargin}px`   // <-- ये negative overlap करता है (pull up)
+            marginTop: `-${negativeMargin}px` 
           }}
         >
           {products.map((p) => (
