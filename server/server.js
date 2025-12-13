@@ -44,15 +44,16 @@ app.use(express.json());
 
 app.use(
   cors({
-    origin: (origin, cb) => {
-      // allow requests with no origin (mobile apps, curl, same-origin)
-      if (!origin) return cb(null, true);
-      if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
-      cb(new Error("CORS policy: origin not allowed"));
-    },
+    origin: [
+      "http://localhost:5173",
+      "http://localhost:3000",
+      "https://sarjan-catalog-1.onrender.com",
+      "https://sarjan-catalog.onrender.com",
+    ],
     credentials: true,
   })
 );
+
 
 // ----- STATIC -----
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
